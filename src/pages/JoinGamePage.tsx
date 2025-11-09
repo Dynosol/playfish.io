@@ -1,53 +1,69 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { subscribeToActiveGames } from '../firebase/gamesService';
-import type { Game } from '../firebase/gamesService';
+import { Link, useNavigate } from 'react-router-dom';
+import { subscribeToActiveLobbies, joinLobby } from '../firebase/lobbyService';
+import type { Lobby } from '../firebase/lobbyService';
+import { useAuth } from '../contexts/AuthContext';
 
 const JoinGamePage: React.FC = () => {
-  const [games, setGames] = useState<Game[]>([]);
+  const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const unsubscribe = subscribeToActiveGames((gamesList) => {
-      setGames(gamesList);
+    const unsubscribe = subscribeToActiveLobbies((lobbiesList) => {
+      setLobbies(lobbiesList);
       setLoading(false);
     });
 
     return unsubscribe;
   }, []);
 
-  const handleJoinGame = (gameId: string) => {
-    console.log('Joining game:', gameId);
+  const handleJoinGame = async (lobbyId: string) => {
+    if (!user) return;
+    
+    setJoining(lobbyId);
+    try {
+      await joinLobby(lobbyId, user.uid);
+      navigate(`/lobby/${lobbyId}`);
+    } catch (error) {
+      console.error('Failed to join lobby:', error);
+      setJoining(null);
+    }
   };
 
   return (
     <div>
-      <h1>Join Game</h1>
+      <h1>Join Lobby</h1>
       <Link to="/">Back to Home</Link>
       
       {loading ? (
-        <p>Loading games...</p>
-      ) : games.length === 0 ? (
-        <p>No active games found. <Link to="/create">Create a new game</Link></p>
+        <p>Loading lobbies...</p>
+      ) : lobbies.length === 0 ? (
+        <p>No active lobbies found. <Link to="/create">Create a new lobby</Link></p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Game Name</th>
+              <th>Lobby Name</th>
               <th>Players</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {games.map(game => (
-              <tr key={game.id}>
-                <td>{game.name}</td>
-                <td>{game.players?.length || 0}/{game.maxPlayers || 4}</td>
-                <td>{game.status}</td>
+            {lobbies.map(lobby => (
+              <tr key={lobby.id}>
+                <td>{lobby.name}</td>
+                <td>{lobby.players?.length || 0}/{lobby.maxPlayers || 4}</td>
+                <td>{lobby.status}</td>
                 <td>
-                  <button onClick={() => handleJoinGame(game.id)}>
-                    Join
+                  <button 
+                    onClick={() => handleJoinGame(lobby.id)}
+                    disabled={joining === lobby.id || (lobby.players?.length || 0) >= (lobby.maxPlayers || 4) || lobby.status !== 'waiting'}
+                  >
+                    {joining === lobby.id ? 'Joining...' : 'Join'}
                   </button>
                 </td>
               </tr>

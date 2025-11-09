@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../firebase/config';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+import { createOrUpdateUser } from '../firebase/userService';
 
 interface AuthContextType {
   user: User | null;
@@ -26,6 +27,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUser(user);
+        try {
+          await createOrUpdateUser(user.uid);
+        } catch (error) {
+          console.error('Failed to create/update user document:', error);
+        }
       }
       setLoading(false);
     });

@@ -4,7 +4,7 @@ import StartPage from './pages/StartPage';
 import JoinGamePage from './pages/JoinGamePage';
 import CreateGamePage from './pages/CreateGamePage';
 import SettingsPage from './pages/SettingsPage';
-import GamePage from './pages/GamePage';
+import LobbyPage from './pages/LobbyPage';
 
 function App() {
   return (
@@ -15,7 +15,7 @@ function App() {
           <Route path="/join" element={<JoinGamePage />} />
           <Route path="/create" element={<CreateGamePage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/game/:gameId" element={<GamePage />} />
+          <Route path="/lobby/:gameId" element={<LobbyPage />} />
         </Routes>
       </Router>
     </AuthProvider>

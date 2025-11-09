@@ -1,38 +1,32 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { createLobby } from '../firebase/lobbyService';
 import { useAuth } from '../contexts/AuthContext';
 
 const CreateGamePage: React.FC = () => {
-  const [gameName, setGameName] = useState('');
+  const [lobbyName, setLobbyName] = useState('');
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const handleCreateGame = async (e: React.FormEvent) => {
+  const handleCreateLobby = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !gameName.trim()) return;
+    if (!user || !lobbyName.trim()) return;
     
     setCreating(true);
     
     try {
-      const gameData = {
-        name: gameName,
+      const lobbyId = await createLobby({
+        name: lobbyName,
         createdBy: user.uid,
-        players: [user.uid],
-        maxPlayers: maxPlayers,
-        status: 'waiting',
-        createdAt: serverTimestamp()
-      };
-      
-      const docRef = await addDoc(collection(db, 'games'), gameData);
-      console.log('Game created with ID:', docRef.id);
-      navigate(`/game/${docRef.id}`);
+        maxPlayers: maxPlayers
+      });
+      console.log('Lobby created with ID:', lobbyId);
+      navigate(`/lobby/${lobbyId}`);
     } catch (error) {
-      console.error('Error creating game:', error);
+      console.error('Error creating lobby:', error);
     } finally {
       setCreating(false);
     }
@@ -40,17 +34,17 @@ const CreateGamePage: React.FC = () => {
 
   return (
     <div>
-      <h1>Create Game</h1>
+      <h1>Create Lobby</h1>
       <Link to="/">Back to Home</Link>
       
-      <form onSubmit={handleCreateGame}>
+      <form onSubmit={handleCreateLobby}>
         <div>
           <label>
-            Game Name:
+            Lobby Name:
             <input
               type="text"
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
+              value={lobbyName}
+              onChange={(e) => setLobbyName(e.target.value)}
               required
               disabled={creating}
             />
@@ -74,8 +68,8 @@ const CreateGamePage: React.FC = () => {
           </label>
         </div>
         
-        <button type="submit" disabled={creating || !gameName.trim()}>
-          {creating ? 'Creating...' : 'Create Game'}
+        <button type="submit" disabled={creating || !lobbyName.trim()}>
+          {creating ? 'Creating...' : 'Create Lobby'}
         </button>
       </form>
     </div>
