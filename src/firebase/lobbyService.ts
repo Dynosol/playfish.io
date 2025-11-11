@@ -42,10 +42,12 @@ export const subscribeToActiveLobbies = (
   );
 
   return onSnapshot(lobbiesQuery, (snapshot) => {
+    console.log('Received lobbies snapshot:', snapshot.docs.length, 'lobbies');
     const lobbiesList = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Lobby));
+    console.log('Lobbies list:', lobbiesList);
     callback(lobbiesList);
   });
 };
@@ -55,9 +57,13 @@ export const subscribeToLobby = (
   callback: (lobby: Lobby | null) => void
 ): (() => void) => {
   return onSnapshot(doc(db, 'lobbies', lobbyId), (docSnapshot) => {
+    console.log('Received lobby snapshot for', lobbyId, ':', docSnapshot.exists());
     if (docSnapshot.exists()) {
-      callback({ id: docSnapshot.id, ...docSnapshot.data() } as Lobby);
+      const lobbyData = { id: docSnapshot.id, ...docSnapshot.data() } as Lobby;
+      console.log('Lobby data:', lobbyData);
+      callback(lobbyData);
     } else {
+      console.log('Lobby does not exist');
       callback(null);
     }
   });
@@ -84,13 +90,20 @@ const leaveAllOtherLobbies = async (userId: string, excludeLobbyId?: string): Pr
     .map(async (doc) => {
       const lobbyData = doc.data() as Lobby;
       const updatedPlayers = lobbyData.players.filter(playerId => playerId !== userId);
+      const isHost = lobbyData.createdBy === userId;
       
       if (updatedPlayers.length === 0) {
         await moveLobbyToDeleted(doc.id, lobbyData);
       } else {
-        await updateDoc(doc.ref, {
+        const updateData: Partial<Lobby> = {
           players: arrayRemove(userId)
-        });
+        };
+        
+        if (isHost && updatedPlayers.length > 0) {
+          updateData.createdBy = updatedPlayers[0];
+        }
+        
+        await updateDoc(doc.ref, updateData);
       }
     });
   
@@ -113,6 +126,7 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
 };
 
 export const joinLobby = async (lobbyId: string, userId: string): Promise<void> => {
+  console.log('joinLobby called for user:', userId, 'lobby:', lobbyId);
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbySnap = await getDoc(lobbyRef);
   
@@ -123,6 +137,7 @@ export const joinLobby = async (lobbyId: string, userId: string): Promise<void> 
   const lobbyData = lobbySnap.data() as Lobby;
   
   if (lobbyData.players.includes(userId)) {
+    console.log('User already in lobby, skipping join');
     return;
   }
   
@@ -139,30 +154,40 @@ export const joinLobby = async (lobbyId: string, userId: string): Promise<void> 
   await updateDoc(lobbyRef, {
     players: arrayUnion(userId)
   });
+  console.log('User added to lobby players array');
   
   await updateUserCurrentLobby(userId, lobbyId);
+  console.log('User currentLobbyId updated');
 };
 
 export const leaveLobby = async (lobbyId: string, userId: string): Promise<void> => {
+  console.log('leaveLobby called for user:', userId, 'lobby:', lobbyId);
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbySnap = await getDoc(lobbyRef);
   
-  if (!lobbySnap.exists()) {
-    return;
-  }
-  
-  const lobbyData = lobbySnap.data() as Lobby;
-  const updatedPlayers = lobbyData.players.filter(playerId => playerId !== userId);
-  
-  if (updatedPlayers.length === 0) {
-    await moveLobbyToDeleted(lobbyId, lobbyData);
-  } else {
-    await updateDoc(lobbyRef, {
-      players: arrayRemove(userId)
-    });
+  if (lobbySnap.exists()) {
+    const lobbyData = lobbySnap.data() as Lobby;
+    const updatedPlayers = lobbyData.players.filter(playerId => playerId !== userId);
+    const isHost = lobbyData.createdBy === userId;
+    
+    if (updatedPlayers.length === 0) {
+      await moveLobbyToDeleted(lobbyId, lobbyData);
+    } else {
+      const updateData: Partial<Lobby> = {
+        players: arrayRemove(userId)
+      };
+      
+      if (isHost && updatedPlayers.length > 0) {
+        updateData.createdBy = updatedPlayers[0];
+      }
+      
+      await updateDoc(lobbyRef, updateData);
+    }
+    console.log('User removed from lobby players array');
   }
   
   await updateUserCurrentLobby(userId, null);
+  console.log('User currentLobbyId set to null');
 };
 
 export const startLobby = async (lobbyId: string): Promise<void> => {

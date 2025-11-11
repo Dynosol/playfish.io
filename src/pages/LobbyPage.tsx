@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, subscribeToLobby, joinLobby, startLobby } from '../firebase/lobbyService';
@@ -8,6 +8,8 @@ const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasJoined, setHasJoined] = useState(false);
+  const isLeavingRef = useRef(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -19,31 +21,42 @@ const LobbyPage: React.FC = () => {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      isLeavingRef.current = false;
+      unsubscribe();
+    };
   }, [gameId]);
 
   useEffect(() => {
-    if (!user || !lobby || !gameId || lobby.players.includes(user.uid)) return;
+    if (!user || !lobby || !gameId || hasJoined || isLeavingRef.current) return;
+    
+    if (lobby.players.includes(user.uid)) {
+      setHasJoined(true);
+      return;
+    }
 
     const handleJoin = async () => {
       try {
         await joinLobby(gameId, user.uid);
+        setHasJoined(true);
       } catch (error) {
         console.error('Failed to join lobby:', error);
       }
     };
 
     handleJoin();
-  }, [user, lobby, gameId]);
+  }, [user, lobby, gameId, hasJoined]);
 
   const handleLeaveLobby = async () => {
     if (!user || !gameId) return;
 
     try {
+      isLeavingRef.current = true;
       await leaveLobby(gameId, user.uid);
       navigate('/join');
     } catch (error) {
       console.error('Failed to leave lobby:', error);
+      isLeavingRef.current = false;
     }
   };
 
