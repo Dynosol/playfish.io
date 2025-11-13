@@ -15,11 +15,6 @@ const SettingsPage: React.FC = () => {
         <p>User ID: {user?.uid}</p>
         <p>Anonymous User</p>
       </div>
-      
-      <div>
-        <h2>Game Settings</h2>
-        <p>Settings will be added here</p>
-      </div>
     </div>
   );
 };
