@@ -47,6 +47,14 @@ const LobbyPage: React.FC = () => {
     handleJoin();
   }, [user, lobby, gameId, hasJoined]);
 
+  useEffect(() => {
+    if (!lobby || !gameId || !user || isLeavingRef.current) return;
+    
+    if (lobby.status === 'playing' && lobby.onGoingGame && lobby.players.includes(user.uid)) {
+      navigate(`/game/${gameId}`);
+    }
+  }, [lobby, gameId, user, navigate]);
+
   const handleLeaveLobby = async () => {
     if (!user || !gameId) return;
 
@@ -114,10 +122,10 @@ const LobbyPage: React.FC = () => {
         </button>
       </div>
 
-      {lobby.status === 'playing' && (
+      {lobby.status === 'playing' && lobby.onGoingGame && (
         <div>
-          <h2>Lobby in Progress</h2>
-          <p>Lobby logic will be implemented here</p>
+          <h2>Game in Progress</h2>
+          <Link to={`/game/${gameId}`}>Go to Game</Link>
         </div>
       )}
     </div>

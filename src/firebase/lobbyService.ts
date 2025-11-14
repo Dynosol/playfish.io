@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { updateUserCurrentLobby } from './userService';
+import { createGame } from './gameService';
 
 export interface Lobby {
   id: string;
@@ -25,6 +26,7 @@ export interface Lobby {
   status: 'waiting' | 'playing' | 'finished';
   createdBy: string;
   createdAt: Date;
+  onGoingGame: string | null;
 }
 
 export interface CreateLobbyData {
@@ -117,6 +119,7 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
     ...lobbyData,
     players: [lobbyData.createdBy],
     status: 'waiting',
+    onGoingGame: null,
     createdAt: serverTimestamp()
   });
   
@@ -191,8 +194,20 @@ export const leaveLobby = async (lobbyId: string, userId: string): Promise<void>
 };
 
 export const startLobby = async (lobbyId: string): Promise<void> => {
-  await updateDoc(doc(db, 'lobbies', lobbyId), {
-    status: 'playing'
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  
+  const gameDocId = await createGame(lobbyId, lobbyData.players);
+  
+  await updateDoc(lobbyRef, {
+    status: 'playing',
+    onGoingGame: gameDocId
   });
 };
 

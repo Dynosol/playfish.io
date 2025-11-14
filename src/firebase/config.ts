@@ -2,20 +2,6 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-const requiredEnvVars = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-};
-
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([, value]) => !value)
-  .map(([key]) => key);
-
-if (missingVars.length > 0) {
-  throw new Error(`Missing required Firebase environment variables: ${missingVars.join(', ')}`);
-}
-
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

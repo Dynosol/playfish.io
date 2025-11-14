@@ -5,6 +5,7 @@ import JoinGamePage from './pages/JoinGamePage';
 import CreateGamePage from './pages/CreateGamePage';
 import SettingsPage from './pages/SettingsPage';
 import LobbyPage from './pages/LobbyPage';
+import GamePage from './pages/GamePage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/create" element={<CreateGamePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/lobby/:gameId" element={<LobbyPage />} />
+          <Route path="/game/:gameId" element={<GamePage />} />
         </Routes>
       </Router>
     </AuthProvider>
