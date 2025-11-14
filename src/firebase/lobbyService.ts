@@ -22,6 +22,7 @@ export interface Lobby {
   id: string;
   name: string;
   players: string[];
+  teams: { [playerId: string]: 0 | 1 | null };
   maxPlayers: number;
   status: 'waiting' | 'playing' | 'finished';
   createdBy: string;
@@ -97,15 +98,16 @@ const leaveAllOtherLobbies = async (userId: string, excludeLobbyId?: string): Pr
       if (updatedPlayers.length === 0) {
         await moveLobbyToDeleted(doc.id, lobbyData);
       } else {
-        const updateData: Partial<Lobby> = {
-          players: arrayRemove(userId)
+        const updatedTeams = { ...lobbyData.teams };
+        delete updatedTeams[userId];
+        
+        const updateData = {
+          players: arrayRemove(userId),
+          teams: updatedTeams,
+          ...(isHost && updatedPlayers.length > 0 ? { createdBy: updatedPlayers[0] } : {})
         };
         
-        if (isHost && updatedPlayers.length > 0) {
-          updateData.createdBy = updatedPlayers[0];
-        }
-        
-        await updateDoc(doc.ref, updateData);
+        await updateDoc(doc.ref, updateData as never);
       }
     });
   
@@ -118,6 +120,7 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
   const docRef = await addDoc(collection(db, 'lobbies'), {
     ...lobbyData,
     players: [lobbyData.createdBy],
+    teams: { [lobbyData.createdBy]: null },
     status: 'waiting',
     onGoingGame: null,
     createdAt: serverTimestamp()
@@ -154,8 +157,13 @@ export const joinLobby = async (lobbyId: string, userId: string): Promise<void> 
   
   await leaveAllOtherLobbies(userId, lobbyId);
   
+  const lobbyDoc = await getDoc(lobbyRef);
+  const currentLobbyData = lobbyDoc.data() as Lobby;
+  const updatedTeams = { ...currentLobbyData.teams, [userId]: null };
+  
   await updateDoc(lobbyRef, {
-    players: arrayUnion(userId)
+    players: arrayUnion(userId),
+    teams: updatedTeams
   });
   console.log('User added to lobby players array');
   
@@ -176,21 +184,81 @@ export const leaveLobby = async (lobbyId: string, userId: string): Promise<void>
     if (updatedPlayers.length === 0) {
       await moveLobbyToDeleted(lobbyId, lobbyData);
     } else {
-      const updateData: Partial<Lobby> = {
-        players: arrayRemove(userId)
+      const updatedTeams = { ...lobbyData.teams };
+      delete updatedTeams[userId];
+      
+      const updateData = {
+        players: arrayRemove(userId),
+        teams: updatedTeams,
+        ...(isHost && updatedPlayers.length > 0 ? { createdBy: updatedPlayers[0] } : {})
       };
       
-      if (isHost && updatedPlayers.length > 0) {
-        updateData.createdBy = updatedPlayers[0];
-      }
-      
-      await updateDoc(lobbyRef, updateData);
+      await updateDoc(lobbyRef, updateData as never);
     }
     console.log('User removed from lobby players array');
   }
   
   await updateUserCurrentLobby(userId, null);
   console.log('User currentLobbyId set to null');
+};
+
+export const joinTeam = async (lobbyId: string, userId: string, team: 0 | 1): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  
+  if (!lobbyData.players.includes(userId)) {
+    throw new Error('User is not in this lobby');
+  }
+  
+  if (lobbyData.status !== 'waiting') {
+    throw new Error('Lobby is not accepting team changes');
+  }
+  
+  const updatedTeams = { ...lobbyData.teams, [userId]: team };
+  
+  await updateDoc(lobbyRef, {
+    teams: updatedTeams
+  });
+};
+
+export const swapPlayerTeam = async (lobbyId: string, playerId: string): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  
+  if (lobbyData.status !== 'waiting') {
+    throw new Error('Lobby is not accepting team changes');
+  }
+  
+  const currentTeam = lobbyData.teams[playerId];
+  if (currentTeam === null) {
+    throw new Error('Player must be assigned to a team before swapping');
+  }
+  
+  const newTeam = currentTeam === 0 ? 1 : 0;
+  
+  const updatedTeams = { ...lobbyData.teams, [playerId]: newTeam };
+  
+  await updateDoc(lobbyRef, {
+    teams: updatedTeams
+  });
+};
+
+export const areTeamsEven = (lobby: Lobby): boolean => {
+  const team0Count = lobby.players.filter(playerId => lobby.teams[playerId] === 0).length;
+  const team1Count = lobby.players.filter(playerId => lobby.teams[playerId] === 1).length;
+  return team0Count === team1Count && team0Count > 0;
 };
 
 export const startLobby = async (lobbyId: string): Promise<void> => {
@@ -203,7 +271,20 @@ export const startLobby = async (lobbyId: string): Promise<void> => {
   
   const lobbyData = lobbySnap.data() as Lobby;
   
-  const gameDocId = await createGame(lobbyId, lobbyData.players);
+  if (!areTeamsEven(lobbyData)) {
+    throw new Error('Teams must be even to start the game');
+  }
+  
+  const teamAssignments: { [playerId: string]: 0 | 1 } = {};
+  for (const playerId of lobbyData.players) {
+    const team = lobbyData.teams[playerId];
+    if (team === null) {
+      throw new Error('All players must be assigned to a team');
+    }
+    teamAssignments[playerId] = team;
+  }
+  
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments);
   
   await updateDoc(lobbyRef, {
     status: 'playing',
