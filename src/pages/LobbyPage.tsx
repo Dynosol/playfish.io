@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven } from '../firebase/lobbyService';
+import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
+import { useUsernames } from '../hooks/useUsername';
 
 const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -101,6 +102,17 @@ const LobbyPage: React.FC = () => {
     }
   };
 
+  const handleRandomizeTeams = async () => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await randomizeTeams(gameId, user.uid);
+    } catch (error) {
+      console.error('Failed to randomize teams:', error);
+      alert((error as Error).message);
+    }
+  }
+
   const getTeamPlayers = (team: 0 | 1 | null): string[] => {
     if (!lobby) return [];
     return lobby.players.filter(playerId => lobby.teams[playerId] === team);
@@ -110,6 +122,8 @@ const LobbyPage: React.FC = () => {
     if (!lobby) return [];
     return lobby.players.filter(playerId => lobby.teams[playerId] === null);
   };
+
+  const usernames = useUsernames(lobby?.players || []);
 
   if (loading) {
     return <div>Loading lobby...</div>;
@@ -146,17 +160,20 @@ const LobbyPage: React.FC = () => {
           <div>
             <h3>Team 1 ({team0Players.length})</h3>
             <ul>
-              {team0Players.map(playerId => (
-                <li key={playerId}>
-                  {playerId === user?.uid ? 'You' : `Player ${playerId.slice(0, 8)}`}
-                  {playerId === lobby.createdBy && ' (Host)'}
-                  {isHost && playerId !== user?.uid && (
-                    <button onClick={() => handleSwapTeam(playerId)}>
-                      Swap
-                    </button>
-                  )}
-                </li>
-              ))}
+              {team0Players.map(playerId => {
+                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                return (
+                  <li key={playerId}>
+                    {playerId === user?.uid ? 'You' : playerUsername}
+                    {playerId === lobby.createdBy && ' (Host)'}
+                    {isHost && playerId !== user?.uid && (
+                      <button onClick={() => handleSwapTeam(playerId)}>
+                        Swap
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             {user && userTeam !== 0 && (
               <button onClick={() => handleJoinTeam(0)}>
@@ -168,17 +185,20 @@ const LobbyPage: React.FC = () => {
           <div>
             <h3>Team 2 ({team1Players.length})</h3>
             <ul>
-              {team1Players.map(playerId => (
-                <li key={playerId}>
-                  {playerId === user?.uid ? 'You' : `Player ${playerId.slice(0, 8)}`}
-                  {playerId === lobby.createdBy && ' (Host)'}
-                  {isHost && playerId !== user?.uid && (
-                    <button onClick={() => handleSwapTeam(playerId)}>
-                      Swap
-                    </button>
-                  )}
-                </li>
-              ))}
+              {team1Players.map(playerId => {
+                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                return (
+                  <li key={playerId}>
+                    {playerId === user?.uid ? 'You' : playerUsername}
+                    {playerId === lobby.createdBy && ' (Host)'}
+                    {isHost && playerId !== user?.uid && (
+                      <button onClick={() => handleSwapTeam(playerId)}>
+                        Swap
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             {user && userTeam !== 1 && (
               <button onClick={() => handleJoinTeam(1)}>
@@ -192,18 +212,27 @@ const LobbyPage: React.FC = () => {
       {lobby.status === 'waiting' && unassignedPlayers.length > 0 && (
         <div>
           <h3>Unassigned Players</h3>
-          <ul>
-            {unassignedPlayers.map(playerId => (
-              <li key={playerId}>
-                {playerId === user?.uid ? 'You' : `Player ${playerId.slice(0, 8)}`}
-                {playerId === lobby.createdBy && ' (Host)'}
-              </li>
-            ))}
+            <ul>
+            {unassignedPlayers.map(playerId => {
+              const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+              return (
+                <li key={playerId}>
+                  {playerId === user?.uid ? 'You' : playerUsername}
+                  {playerId === lobby.createdBy && ' (Host)'}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
 
       <div>
+        {lobby.status === 'waiting' && isHost && (
+          <button onClick={handleRandomizeTeams}>
+            Randomize Teams
+          </button>
+        )}
+
         {lobby.status === 'waiting' && isHost && (
           <button onClick={handleStartLobby} disabled={!teamsEven || lobby.players.length < 2}>
             Start Game

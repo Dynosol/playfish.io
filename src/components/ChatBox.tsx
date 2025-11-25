@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { sendMessage, subscribeToMessages, type ChatMessage } from '../firebase/chatService';
+import { useUsername } from '../hooks/useUsername';
 
 interface ChatBoxProps {
   gameId: string;
@@ -12,6 +13,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId }) => {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const username = useUsername(user?.uid);
 
   useEffect(() => {
     if (!gameId) return;
@@ -35,7 +37,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId }) => {
 
     setSending(true);
     try {
-      const userName = user.displayName || `User ${user.uid.slice(0, 8)}`;
+      const userName = username || `User ${user.uid.slice(0, 16)}`;
       await sendMessage(gameId, user.uid, userName, inputMessage);
       setInputMessage('');
     } catch (error) {

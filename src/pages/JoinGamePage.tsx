@@ -33,6 +33,14 @@ const JoinGamePage: React.FC = () => {
     }
   };
 
+  const handleSpectate = (lobbyId: string, status: string) => {
+    if (status === 'playing') {
+      navigate(`/game/${lobbyId}`);
+    } else {
+      navigate(`/lobby/${lobbyId}`);
+    }
+  };
+
   return (
     <div>
       <h1>Join Lobby</h1>
@@ -53,21 +61,34 @@ const JoinGamePage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {lobbies.map(lobby => (
-              <tr key={lobby.id}>
-                <td>{lobby.name}</td>
-                <td>{lobby.players?.length || 0}/{lobby.maxPlayers || 4}</td>
-                <td>{lobby.status}</td>
-                <td>
-                  <button 
-                    onClick={() => handleJoinGame(lobby.id)}
-                    disabled={joining === lobby.id || (lobby.players?.length || 0) >= (lobby.maxPlayers || 4) || lobby.status !== 'waiting'}
-                  >
-                    {joining === lobby.id ? 'Joining...' : 'Join'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {lobbies.map(lobby => {
+              const isFull = (lobby.players?.length || 0) >= (lobby.maxPlayers || 4);
+              const canJoin = !isFull && lobby.status === 'waiting';
+              
+              return (
+                <tr key={lobby.id}>
+                  <td>{lobby.name}</td>
+                  <td>{lobby.players?.length || 0}/{lobby.maxPlayers || 4}</td>
+                  <td>{lobby.status}</td>
+                  <td>
+                    {canJoin ? (
+                      <button 
+                        onClick={() => handleJoinGame(lobby.id)}
+                        disabled={joining === lobby.id}
+                      >
+                        {joining === lobby.id ? 'Joining...' : 'Join'}
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleSpectate(lobby.id, lobby.status)}
+                      >
+                        Spectate
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

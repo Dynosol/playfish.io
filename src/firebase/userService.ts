@@ -11,9 +11,11 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from './config';
+import { generateUsername } from '../utils/usernameGenerator';
 
 export interface UserDocument {
   uid: string;
+  username: string;
   currentLobbyId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -30,8 +32,10 @@ export const createOrUpdateUser = async (uid: string): Promise<void> => {
       lastOnline: serverTimestamp()
     }, { merge: true });
   } else {
+    const username = generateUsername();
     await setDoc(userRef, {
       uid,
+      username,
       currentLobbyId: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -78,6 +82,21 @@ export const updateUserLastOnline = async (uid: string): Promise<void> => {
   const userRef = doc(db, 'users', uid);
   await setDoc(userRef, {
     lastOnline: serverTimestamp()
+  }, { merge: true });
+};
+
+export const updateUsername = async (uid: string, username: string): Promise<void> => {
+  if (!username || username.trim().length === 0) {
+    throw new Error('Username cannot be empty');
+  }
+  if (username.trim().length > 50) {
+    throw new Error('Username must be 50 characters or less');
+  }
+  
+  const userRef = doc(db, 'users', uid);
+  await setDoc(userRef, {
+    username: username.trim(),
+    updatedAt: serverTimestamp()
   }, { merge: true });
 };
 

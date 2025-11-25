@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -7,14 +7,20 @@ import {
   getTeamPlayers,
   getOpponents,
   askForCard,
-  getHalfSuit,
   belongsToHalfSuit,
+  getHalfSuitFromCard,
+  getAllCardsInHalfSuit,
+  getCardKey,
+  isPlayerAlive,
+  startDeclaration,
+  finishDeclaration,
   type Card
 } from '../firebase/gameService';
 import { subscribeToLobby } from '../firebase/lobbyService';
 import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
 import ChatBox from '../components/ChatBox';
+import { useUsernames } from '../hooks/useUsername';
 
 const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -23,12 +29,16 @@ const GamePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // State for asking for cards
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const [selectedSuit, setSelectedSuit] = useState<Card['suit']>('spades');
   const [selectedRank, setSelectedRank] = useState<Card['rank']>('A');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isAsking, setIsAsking] = useState(false);
+  const [declareError, setDeclareError] = useState<string>('');
+  const [isDeclaring, setIsDeclaring] = useState(false);
+  const [declarationHalfSuit, setDeclarationHalfSuit] = useState<Card['halfSuit'] | null>(null);
+  const [declarationTeam, setDeclarationTeam] = useState<0 | 1 | null>(null);
+  const [declarationAssignments, setDeclarationAssignments] = useState<{ [cardKey: string]: string }>({});
 
   useEffect(() => {
     if (!gameId) return;
@@ -62,6 +72,18 @@ const GamePage: React.FC = () => {
     };
   }, [gameId]);
 
+  useEffect(() => {
+    if (game && !game.declarePhase?.active) {
+      setDeclarationHalfSuit(null);
+      setDeclarationTeam(null);
+      setDeclarationAssignments({});
+      setDeclareError('');
+    }
+  }, [game]);
+
+  const playersArray = useMemo(() => game?.players || [], [game?.players]);
+  const usernames = useUsernames(playersArray);
+
   if (loading) {
     return <div>Loading game...</div>;
   }
@@ -86,11 +108,11 @@ const GamePage: React.FC = () => {
 
   const isPlayer = user && game.players.includes(user.uid);
   const playerHand = isPlayer ? getPlayerHand(game, user.uid) : [];
-
+  const currentTurnUsername = usernames.get(game.currentTurn) || `Player ${game.currentTurn.slice(0, 16)}`;
   const isMyTurn = isPlayer && game.currentTurn === user.uid;
   const currentTurnPlayerName = game.currentTurn === user?.uid
     ? 'You'
-    : `Player ${game.currentTurn.slice(0, 8)}`;
+    : currentTurnUsername;
 
   const opponents = isPlayer ? getOpponents(game, user.uid) : [];
 
@@ -98,9 +120,8 @@ const GamePage: React.FC = () => {
   const allSuits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
   const allRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
 
-  // Get half-suits the player belongs to
   const myHalfSuits = isPlayer
-    ? Array.from(new Set(playerHand.map(card => getHalfSuit(card))))
+    ? Array.from(new Set(playerHand.map(card => card.halfSuit)))
     : [];
 
   const handleAskForCard = async () => {
@@ -109,7 +130,11 @@ const GamePage: React.FC = () => {
     setErrorMessage('');
     setIsAsking(true);
 
-    const card: Card = { suit: selectedSuit, rank: selectedRank };
+    const card: Card = { 
+      suit: selectedSuit, 
+      rank: selectedRank, 
+      halfSuit: getHalfSuitFromCard(selectedSuit, selectedRank) 
+    };
 
     const result = await askForCard(game.id, user.uid, selectedOpponent, card);
 
@@ -124,16 +149,86 @@ const GamePage: React.FC = () => {
     setIsAsking(false);
   };
 
-  // Check if the selected card is valid to ask for
   const canAskForCard = (): boolean => {
     if (!isPlayer || !selectedOpponent) return false;
+    if (game.declarePhase?.active) return false;
 
-    const card: Card = { suit: selectedSuit, rank: selectedRank };
-    const cardHalfSuit = getHalfSuit(card);
+    const cardHalfSuit = getHalfSuitFromCard(selectedSuit, selectedRank);
 
     return belongsToHalfSuit(playerHand, cardHalfSuit) &&
-           !playerHand.some(c => c.suit === card.suit && c.rank === card.rank);
+           !playerHand.some(c => c.suit === selectedSuit && c.rank === selectedRank);
   };
+
+  const handleDeclare = async () => {
+    if (!isPlayer || !game || !user) return;
+
+    setDeclareError('');
+    setIsDeclaring(true);
+    setDeclarationHalfSuit(null);
+    setDeclarationTeam(null);
+    setDeclarationAssignments({});
+
+    const result = await startDeclaration(game.id, user.uid);
+
+    if (!result.success && result.error) {
+      setDeclareError(result.error);
+      setIsDeclaring(false);
+    } else {
+      setIsDeclaring(false);
+    }
+  };
+
+  const handleSelectHalfSuit = (halfSuit: Card['halfSuit']) => {
+    setDeclarationHalfSuit(halfSuit);
+    setDeclarationTeam(null);
+    setDeclarationAssignments({});
+  };
+
+  const handleSelectTeam = (team: 0 | 1) => {
+    setDeclarationTeam(team);
+    setDeclarationAssignments({});
+  };
+
+  const handleAssignCard = (cardKey: string, playerId: string) => {
+    setDeclarationAssignments(prev => ({
+      ...prev,
+      [cardKey]: playerId
+    }));
+  };
+
+  const handleFinishDeclaration = async () => {
+    if (!isPlayer || !game || !user) return;
+    if (!declarationHalfSuit || declarationTeam === null) return;
+
+    setDeclareError('');
+    setIsDeclaring(true);
+
+    const result = await finishDeclaration(
+      game.id,
+      user.uid,
+      declarationHalfSuit,
+      declarationTeam,
+      declarationAssignments
+    );
+
+    if (!result.success && result.error) {
+      setDeclareError(result.error);
+    } else {
+      setDeclarationHalfSuit(null);
+      setDeclarationTeam(null);
+      setDeclarationAssignments({});
+    }
+
+    setIsDeclaring(false);
+  };
+
+  const isInDeclarePhase = game.declarePhase?.active || false;
+  const isDeclaree = isPlayer && game.declarePhase?.declareeId === user?.uid;
+  const allHalfSuits: Card['halfSuit'][] = [
+    'low-spades', 'high-spades', 'low-hearts', 'high-hearts',
+    'low-diamonds', 'high-diamonds', 'low-clubs', 'high-clubs'
+  ];
+  const availableHalfSuits = allHalfSuits.filter(hs => !game.completedHalfsuits.includes(hs));
 
   return (
     <div>
@@ -143,9 +238,26 @@ const GamePage: React.FC = () => {
 
         <div>
           <h2>
-            {isMyTurn ? "It's Your Turn!" : `It is ${currentTurnPlayerName}'s turn.`}
+            {isInDeclarePhase 
+              ? `Declaration Phase - ${game.declarePhase?.declareeId === user?.uid ? 'Your' : usernames.get(game.declarePhase?.declareeId || '') || 'Player'}'s Declaration`
+              : isMyTurn ? "It's Your Turn!" : `It is ${currentTurnPlayerName}'s turn.`}
           </h2>
         </div>
+
+        <div>
+          <h3>Scores</h3>
+          <div>Team 1: {game.scores?.[0] || 0}</div>
+          <div>Team 2: {game.scores?.[1] || 0}</div>
+        </div>
+
+        {game.completedHalfsuits && game.completedHalfsuits.length > 0 && (
+          <div>
+            <h3>Completed Halfsuits</h3>
+            <div>
+              {game.completedHalfsuits.join(', ')}
+            </div>
+          </div>
+        )}
 
         {!isPlayer && (
           <div>
@@ -153,7 +265,7 @@ const GamePage: React.FC = () => {
           </div>
         )}
 
-        {isPlayer && isMyTurn && (
+        {isPlayer && isMyTurn && !isInDeclarePhase && (
           <div>
             <h3>Ask for a Card</h3>
 
@@ -164,11 +276,14 @@ const GamePage: React.FC = () => {
                 onChange={(e) => setSelectedOpponent(e.target.value)}
               >
                 <option value="">-- Select Opponent --</option>
-                {opponents.map(opponentId => (
-                  <option key={opponentId} value={opponentId}>
-                    Player {opponentId.slice(0, 8)} ({game.playerHands[opponentId]?.length || 0} cards)
-                  </option>
-                ))}
+                {opponents.map(opponentId => {
+                  const opponentUsername = usernames.get(opponentId) || `Player ${opponentId.slice(0, 16)}`;
+                  return (
+                    <option key={opponentId} value={opponentId}>
+                      {opponentUsername} ({game.playerHands[opponentId]?.length || 0} cards)
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -223,64 +338,162 @@ const GamePage: React.FC = () => {
             <div>
               {playerHand.map((card, index) => (
                 <div key={index}>
-                  {card.rank} of {card.suit} ({getHalfSuit(card)})
+                  {card.rank} of {card.suit} ({card.halfSuit})
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div>
-          <h2>Teams</h2>
+        {isPlayer && !isInDeclarePhase && isPlayerAlive(game, user.uid) && (
           <div>
+            <button onClick={handleDeclare} disabled={isDeclaring}>
+              {isDeclaring ? 'Starting Declaration...' : 'Declare'}
+            </button>
+            {declareError && (
+              <div>
+                {declareError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isInDeclarePhase && isDeclaree && (
+          <div>
+            <h3>Declaration Phase</h3>
+            
+            {!declarationHalfSuit && (
+              <div>
+                <h4>Step 1: Select Halfsuit</h4>
+                <div>
+                  {availableHalfSuits.map(halfSuit => (
+                    <button
+                      key={halfSuit}
+                      onClick={() => handleSelectHalfSuit(halfSuit)}
+                    >
+                      {halfSuit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {declarationHalfSuit && declarationTeam === null && (
+              <div>
+                <h4>Step 2: Select Team</h4>
+                <div>
+                  Selected Halfsuit: {declarationHalfSuit}
+                </div>
+                <div>
+                  <button onClick={() => handleSelectTeam(0)}>
+                    Team 1
+                  </button>
+                  <button onClick={() => handleSelectTeam(1)}>
+                    Team 2
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {declarationHalfSuit && declarationTeam !== null && (
+              <div>
+                <h4>Step 3: Assign Cards</h4>
+                <div>
+                  Halfsuit: {declarationHalfSuit}
+                </div>
+                <div>
+                  Team: {declarationTeam === 0 ? 'Team 1' : 'Team 2'}
+                </div>
+                <div>
+                  {getAllCardsInHalfSuit(declarationHalfSuit).map(card => {
+                    const cardKey = getCardKey(card);
+                    const assignedPlayerId = declarationAssignments[cardKey];
+                    const teamPlayers = getTeamPlayers(game, declarationTeam);
+                    
+                    return (
+                      <div key={cardKey}>
+                        <span>{card.rank} of {card.suit}: </span>
+                        <select
+                          value={assignedPlayerId || ''}
+                          onChange={(e) => handleAssignCard(cardKey, e.target.value)}
+                        >
+                          <option value="">-- Select Player --</option>
+                          {teamPlayers.map(playerId => {
+                            const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                            const isCurrentUser = playerId === user?.uid;
+                            return (
+                              <option key={playerId} value={playerId}>
+                                {isCurrentUser ? 'You' : playerUsername}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div>
+                  <button
+                    onClick={handleFinishDeclaration}
+                    disabled={isDeclaring || !getAllCardsInHalfSuit(declarationHalfSuit).every(card => {
+                      const cardKey = getCardKey(card);
+                      return declarationAssignments[cardKey] !== undefined;
+                    })}
+                  >
+                    {isDeclaring ? 'Finishing...' : 'Finish Declaration'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {declareError && (
+              <div>
+                {declareError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isInDeclarePhase && !isDeclaree && (
+          <div>
+            <h3>Declaration in Progress</h3>
             <div>
-              <h3>Team 1</h3>
-              <ul>
-                {getTeamPlayers(game, 0).map(playerId => {
-                  const playerHandSize = game.playerHands[playerId]?.length || 0;
-                  const isCurrentUser = playerId === user?.uid;
-                  return (
-                    <li key={playerId}>
-                      {isCurrentUser ? 'You' : `Player ${playerId.slice(0, 8)}`} - {playerHandSize} cards
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-            <div>
-              <h3>Team 2</h3>
-              <ul>
-                {getTeamPlayers(game, 1).map(playerId => {
-                  const playerHandSize = game.playerHands[playerId]?.length || 0;
-                  const isCurrentUser = playerId === user?.uid;
-                  return (
-                    <li key={playerId}>
-                      {isCurrentUser ? 'You' : `Player ${playerId.slice(0, 8)}`} - {playerHandSize} cards
-                    </li>
-                  );
-                })}
-              </ul>
+              {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} is making a declaration.
+              Please wait...
             </div>
           </div>
-        </div>
+        )}
 
-        <div>
-          <h2>Turn History</h2>
+        <div>    
           <div>
-            {game.turns.length === 0 ? (
-              <p>No turns yet</p>
-            ) : (
-              game.turns.slice().reverse().map((turn, index) => {
-                const askerName = turn.askerId === user?.uid ? 'You' : `Player ${turn.askerId.slice(0, 8)}`;
-                const targetName = turn.targetId === user?.uid ? 'You' : `Player ${turn.targetId.slice(0, 8)}`;
-
+            <h3>Team 1</h3>
+            <ul>
+              {getTeamPlayers(game, 0).map(playerId => {
+                const playerHandSize = game.playerHands[playerId]?.length || 0;
+                const isCurrentUser = playerId === user?.uid;
+                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
                 return (
-                  <div key={game.turns.length - 1 - index}>
-                    {askerName} asked {targetName} for {turn.card.rank} of {turn.card.suit} - {turn.success ? 'Success!' : 'Failed'}
-                  </div>
+                  <li key={playerId}>
+                    {isCurrentUser ? 'You' : playerUsername} - {playerHandSize} cards
+                  </li>
                 );
-              })
-            )}
+              })}
+            </ul>
+          </div>
+          <div>
+            <h3>Team 2</h3>
+            <ul>
+              {getTeamPlayers(game, 1).map(playerId => {
+                const playerHandSize = game.playerHands[playerId]?.length || 0;
+                const isCurrentUser = playerId === user?.uid;
+                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                return (
+                  <li key={playerId}>
+                    {isCurrentUser ? 'You' : playerUsername} - {playerHandSize} cards
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </div>
       </div>

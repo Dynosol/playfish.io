@@ -75,7 +75,7 @@ export const subscribeToMessages = (
         id: doc.id,
         gameId: data.gameId,
         userId: data.userId,
-        userName: data.userName || `User ${data.userId.slice(0, 8)}`,
+        userName: data.userName || `User ${data.userId.slice(0, 16)}`,
         message: data.message,
         timestamp,
         createdAt

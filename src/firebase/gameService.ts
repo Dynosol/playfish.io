@@ -12,10 +12,9 @@ import { db } from './config';
 export interface Card {
   suit: 'spades' | 'hearts' | 'diamonds' | 'clubs';
   rank: 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '9' | '10' | 'J' | 'Q' | 'K';
+  halfSuit: 'low-spades' | 'high-spades' | 'low-hearts' | 'high-hearts' |
+            'low-diamonds' | 'high-diamonds' | 'low-clubs' | 'high-clubs';
 }
-
-export type HalfSuit = 'low-spades' | 'high-spades' | 'low-hearts' | 'high-hearts' |
-                       'low-diamonds' | 'high-diamonds' | 'low-clubs' | 'high-clubs';
 
 export interface Turn {
   askerId: string;
@@ -23,6 +22,20 @@ export interface Turn {
   card: Card;
   success: boolean;
   timestamp: Date;
+}
+
+export interface Declaration {
+  declareeId: string;
+  halfSuit: Card['halfSuit'];
+  team: 0 | 1;
+  assignments: { [cardKey: string]: string };
+  correct: boolean;
+  timestamp: Date;
+}
+
+export interface DeclarePhase {
+  active: boolean;
+  declareeId: string | null;
 }
 
 export interface Game {
@@ -34,17 +47,51 @@ export interface Game {
   currentTurn: string;
   turnOrder: string[];
   turns: Turn[];
+  scores: { 0: number; 1: number };
+  completedHalfsuits: Card['halfSuit'][];
+  declarations: Declaration[];
+  declarePhase: DeclarePhase | null;
   createdAt: Date;
 }
 
 const suits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
 const ranks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
 
+export const getHalfSuitFromCard = (suit: Card['suit'], rank: Card['rank']): Card['halfSuit'] => {
+  const lowRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6'];
+  const isLow = lowRanks.includes(rank);
+  const prefix = isLow ? 'low' : 'high';
+  return `${prefix}-${suit}` as Card['halfSuit'];
+};
+
+export const getAllCardsInHalfSuit = (halfSuit: Card['halfSuit']): Card[] => {
+  const [lowOrHigh, suit] = halfSuit.split('-') as [string, Card['suit']];
+  const isLow = lowOrHigh === 'low';
+  const ranksForHalfSuit: Card['rank'][] = isLow 
+    ? ['A', '2', '3', '4', '5', '6']
+    : ['7', '9', '10', 'J', 'Q', 'K'];
+  
+  return ranksForHalfSuit.map(rank => ({
+    suit,
+    rank,
+    halfSuit: getHalfSuitFromCard(suit, rank)
+  }));
+};
+
+export const getCardKey = (card: Card): string => {
+  return `${card.suit}-${card.rank}`;
+};
+
+export const isPlayerAlive = (game: Game, playerId: string): boolean => {
+  const hand = game.playerHands[playerId] || [];
+  return hand.length > 0;
+};
+
 const createDeck = (): Card[] => {
   const deck: Card[] = [];
   for (const suit of suits) {
     for (const rank of ranks) {
-      deck.push({ suit, rank });
+      deck.push({ suit, rank, halfSuit: getHalfSuitFromCard(suit, rank) });
     }
   }
   return deck;
@@ -109,6 +156,10 @@ export const createGame = async (gameId: string, players: string[], teamAssignme
     currentTurn: firstPlayer,
     turnOrder: players,
     turns: [],
+    scores: { 0: 0, 1: 0 },
+    completedHalfsuits: [],
+    declarations: [],
+    declarePhase: null,
     createdAt: serverTimestamp()
   };
 
@@ -150,20 +201,8 @@ export const getPlayerTeam = (game: Game, playerId: string): 0 | 1 | undefined =
   return game.teams[playerId];
 };
 
-// Helper function to determine which half-suit a card belongs to
-export const getHalfSuit = (card: Card): HalfSuit => {
-  const lowRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7'];
-  const highRanks: Card['rank'][] = ['9', '10', 'J', 'Q', 'K'];
-
-  const isLow = lowRanks.includes(card.rank);
-  const prefix = isLow ? 'low' : 'high';
-
-  return `${prefix}-${card.suit}` as HalfSuit;
-};
-
-// Check if a player belongs to a half-suit (has at least one card in it)
-export const belongsToHalfSuit = (hand: Card[], halfSuit: HalfSuit): boolean => {
-  return hand.some(card => getHalfSuit(card) === halfSuit);
+export const belongsToHalfSuit = (hand: Card[], halfSuit: Card['halfSuit']): boolean => {
+  return hand.some(card => card.halfSuit === halfSuit);
 };
 
 // Check if player has a specific card
@@ -196,7 +235,10 @@ export const askForCard = async (
 
     const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
-    // Validation 1: Is it the asker's turn?
+    if (game.declarePhase?.active) {
+      return { success: false, error: 'Game is paused during declaration phase' };
+    }
+
     if (game.currentTurn !== askerId) {
       return { success: false, error: 'It is not your turn' };
     }
@@ -215,9 +257,7 @@ export const askForCard = async (
       return { success: false, error: 'You already have this card' };
     }
 
-    // Validation 4: Does the asker belong to this half-suit?
-    const cardHalfSuit = getHalfSuit(card);
-    if (!belongsToHalfSuit(askerHand, cardHalfSuit)) {
+    if (!belongsToHalfSuit(askerHand, card.halfSuit)) {
       return { success: false, error: 'You do not belong to this half-suit' };
     }
 
@@ -260,6 +300,146 @@ export const askForCard = async (
     return { success: true };
   } catch (error) {
     console.error('Error in askForCard:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const startDeclaration = async (
+  gameDocId: string,
+  declareeId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+    const gameSnap = await getDoc(gameRef);
+
+    if (!gameSnap.exists()) {
+      return { success: false, error: 'Game not found' };
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (game.declarePhase?.active) {
+      return { success: false, error: 'A declaration is already in progress' };
+    }
+
+    if (!isPlayerAlive(game, declareeId)) {
+      return { success: false, error: 'You must have cards to declare' };
+    }
+
+    const declarePhase: DeclarePhase = {
+      active: true,
+      declareeId
+    };
+
+    await updateDoc(gameRef, {
+      declarePhase
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in startDeclaration:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const finishDeclaration = async (
+  gameDocId: string,
+  declareeId: string,
+  halfSuit: Card['halfSuit'],
+  team: 0 | 1,
+  assignments: { [cardKey: string]: string }
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+    const gameSnap = await getDoc(gameRef);
+
+    if (!gameSnap.exists()) {
+      return { success: false, error: 'Game not found' };
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.declarePhase?.active || game.declarePhase.declareeId !== declareeId) {
+      return { success: false, error: 'You are not the active declaree' };
+    }
+
+    if (game.completedHalfsuits.includes(halfSuit)) {
+      return { success: false, error: 'This halfsuit has already been completed' };
+    }
+
+    const allCardsInHalfSuit = getAllCardsInHalfSuit(halfSuit);
+    const allCardsAssigned = allCardsInHalfSuit.every(card => {
+      const cardKey = getCardKey(card);
+      return assignments[cardKey] !== undefined;
+    });
+
+    if (!allCardsAssigned) {
+      return { success: false, error: 'You must assign all cards in the halfsuit' };
+    }
+
+    const teamPlayers = getTeamPlayers(game, team);
+    for (const card of allCardsInHalfSuit) {
+      const cardKey = getCardKey(card);
+      const assignedPlayerId = assignments[cardKey];
+      if (!teamPlayers.includes(assignedPlayerId)) {
+        return { success: false, error: 'All cards must be assigned to players on the selected team' };
+      }
+    }
+
+    let allCorrect = true;
+    const updatedPlayerHands = { ...game.playerHands };
+
+    for (const card of allCardsInHalfSuit) {
+      const cardKey = getCardKey(card);
+      const assignedPlayerId = assignments[cardKey];
+      const assignedPlayerHand = updatedPlayerHands[assignedPlayerId] || [];
+      
+      const hasTheCard = hasCard(assignedPlayerHand, card);
+      if (!hasTheCard) {
+        allCorrect = false;
+      }
+    }
+
+    for (const playerId of game.players) {
+      const playerHand = updatedPlayerHands[playerId] || [];
+      updatedPlayerHands[playerId] = playerHand.filter(
+        card => card.halfSuit !== halfSuit
+      );
+    }
+
+    const declareeTeam = game.teams[declareeId];
+    const oppositeTeam = declareeTeam === 0 ? 1 : 0;
+
+    const currentScores = game.scores || { 0: 0, 1: 0 };
+    const updatedScores = { ...currentScores };
+    if (allCorrect) {
+      updatedScores[declareeTeam] = (updatedScores[declareeTeam] || 0) + 1;
+    } else {
+      updatedScores[oppositeTeam] = (updatedScores[oppositeTeam] || 0) + 1;
+    }
+
+    const updatedCompletedHalfsuits = [...game.completedHalfsuits, halfSuit];
+
+    const declaration: Declaration = {
+      declareeId,
+      halfSuit,
+      team,
+      assignments,
+      correct: allCorrect,
+      timestamp: new Date()
+    };
+
+    await updateDoc(gameRef, {
+      playerHands: updatedPlayerHands,
+      scores: updatedScores,
+      completedHalfsuits: updatedCompletedHalfsuits,
+      declarations: [...game.declarations, declaration],
+      declarePhase: null
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in finishDeclaration:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

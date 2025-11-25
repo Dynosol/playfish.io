@@ -261,6 +261,43 @@ export const areTeamsEven = (lobby: Lobby): boolean => {
   return team0Count === team1Count && team0Count > 0;
 };
 
+export const randomizeTeams = async (lobbyId: string, playerId: string): Promise<void> => { 
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  
+  if (lobbyData.status !== 'waiting') {
+    throw new Error('Lobby is not accepting team changes');
+  }
+
+  const playerList = lobbyData.players;
+
+  const shuffledPlayers = [...playerList];
+  for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+  }
+
+  const newTeams: { [playerId: string]: 0 | 1 | null } = {};
+  const playerCount = shuffledPlayers.length;
+  const teamSize = Math.ceil(playerCount / 2);
+
+  for (let i = 0; i < playerCount; i++) {
+    const player = shuffledPlayers[i];
+    const team = i < teamSize ? 0 : 1;
+    newTeams[player] = team;
+  }
+
+  await updateDoc(lobbyRef, {
+    teams: newTeams
+  });
+}
+
 export const startLobby = async (lobbyId: string): Promise<void> => {
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbySnap = await getDoc(lobbyRef);
