@@ -41,6 +41,7 @@ const StartPage: React.FC = () => {
   return (
     <div>
       <h1>Fish</h1>
+      <p>Welcome, {userDoc?.username ?? 'Loading username...'}</p>
       <nav>
         <ul>
           <li><Link to="/join">Join Game</Link></li>
