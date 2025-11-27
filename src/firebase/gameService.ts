@@ -51,6 +51,8 @@ export interface Game {
   completedHalfsuits: Card['halfSuit'][];
   declarations: Declaration[];
   declarePhase: DeclarePhase | null;
+  gameOver: { winner: 0 | 1 | null } | null;
+  replayVotes: string[];
   createdAt: Date;
 }
 
@@ -160,6 +162,8 @@ export const createGame = async (gameId: string, players: string[], teamAssignme
     completedHalfsuits: [],
     declarations: [],
     declarePhase: null,
+    gameOver: null,
+    replayVotes: [],
     createdAt: serverTimestamp()
   };
 
@@ -441,17 +445,106 @@ export const finishDeclaration = async (
       timestamp: new Date()
     };
 
+    let gameOver = game.gameOver;
+    const wasGameOver = gameOver !== null;
+    if (updatedScores[0] >= 5) {
+      gameOver = { winner: 0 };
+    } else if (updatedScores[1] >= 5) {
+      gameOver = { winner: 1 };
+    }
+
     await updateDoc(gameRef, {
       playerHands: updatedPlayerHands,
       scores: updatedScores,
       completedHalfsuits: updatedCompletedHalfsuits,
       declarations: [...game.declarations, declaration],
-      declarePhase: null
+      declarePhase: null,
+      gameOver
     });
+
+    if (gameOver && !wasGameOver) {
+      const lobbyRef = doc(db, 'lobbies', game.gameId);
+      const lobbySnap = await getDoc(lobbyRef);
+      if (lobbySnap.exists()) {
+        const lobbyData = lobbySnap.data();
+        const currentHistoricalScores = lobbyData?.historicalScores || { 0: 0, 1: 0 };
+        const updatedHistoricalScores = {
+          0: currentHistoricalScores[0] + updatedScores[0],
+          1: currentHistoricalScores[1] + updatedScores[1]
+        };
+        await updateDoc(lobbyRef, {
+          historicalScores: updatedHistoricalScores
+        });
+      }
+    }
 
     return { success: true };
   } catch (error) {
     console.error('Error in finishDeclaration:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const voteForReplay = async (
+  gameDocId: string,
+  playerId: string
+): Promise<{ success: boolean; error?: string; shouldReplay?: boolean }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+    const gameSnap = await getDoc(gameRef);
+
+    if (!gameSnap.exists()) {
+      return { success: false, error: 'Game not found' };
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.gameOver) {
+      return { success: false, error: 'Game is not over' };
+    }
+
+    if (game.replayVotes.includes(playerId)) {
+      return { success: false, error: 'You have already voted for replay' };
+    }
+
+    const lobbyRef = doc(db, 'lobbies', game.gameId);
+    const lobbySnap = await getDoc(lobbyRef);
+    
+    if (!lobbySnap.exists()) {
+      return { success: false, error: 'Lobby not found' };
+    }
+
+    const lobbyData = lobbySnap.data() as { createdBy: string; historicalScores?: { 0: number; 1: number } };
+    const hostId = lobbyData.createdBy;
+    const nonHostPlayers = game.players.filter(p => p !== hostId);
+    const updatedReplayVotes = [...game.replayVotes, playerId];
+    const allNonHostVoted = nonHostPlayers.every(p => updatedReplayVotes.includes(p));
+
+    await updateDoc(gameRef, {
+      replayVotes: updatedReplayVotes
+    });
+
+    if (allNonHostVoted) {
+      const historicalScores = lobbyData.historicalScores || { 0: 0, 1: 0 };
+      const teamAssignments: { [playerId: string]: 0 | 1 } = {};
+      for (const pid of game.players) {
+        teamAssignments[pid] = game.teams[pid];
+      }
+
+      const newGameDocId = await createGame(game.gameId, game.players, teamAssignments);
+
+      await updateDoc(lobbyRef, {
+        status: 'playing',
+        onGoingGame: newGameDocId,
+        historicalScores
+      });
+
+      return { success: true, shouldReplay: true };
+    }
+
+    return { success: true, shouldReplay: false };
+  } catch (error) {
+    console.error('Error in voteForReplay:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

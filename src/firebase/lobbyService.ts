@@ -27,6 +27,7 @@ export interface Lobby {
   createdBy: string;
   createdAt: Date;
   onGoingGame: string | null;
+  historicalScores: { 0: number; 1: number };
 }
 
 export interface CreateLobbyData {
@@ -134,6 +135,7 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
     teams: { [lobbyData.createdBy]: null },
     status: 'waiting',
     onGoingGame: null,
+    historicalScores: { 0: 0, 1: 0 },
     createdAt: serverTimestamp()
   });
   
@@ -340,11 +342,62 @@ export const startLobby = async (lobbyId: string): Promise<void> => {
     teamAssignments[playerId] = team;
   }
   
+  const historicalScores = lobbyData.historicalScores || { 0: 0, 1: 0 };
+  
   const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments);
   
   await updateDoc(lobbyRef, {
     status: 'playing',
-    onGoingGame: gameDocId
+    onGoingGame: gameDocId,
+    historicalScores
+  });
+};
+
+export const returnToLobby = async (lobbyId: string): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  await updateDoc(lobbyRef, {
+    status: 'waiting',
+    onGoingGame: null
+  });
+};
+
+export const replayGame = async (lobbyId: string): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  
+  if (!areTeamsEven(lobbyData)) {
+    throw new Error('Teams must be even to start the game');
+  }
+  
+  const teamAssignments: { [playerId: string]: 0 | 1 } = {};
+  for (const playerId of lobbyData.players) {
+    const team = lobbyData.teams[playerId];
+    if (team === null) {
+      throw new Error('All players must be assigned to a team');
+    }
+    teamAssignments[playerId] = team;
+  }
+  
+  const historicalScores = lobbyData.historicalScores || { 0: 0, 1: 0 };
+  
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments);
+  
+  await updateDoc(lobbyRef, {
+    status: 'playing',
+    onGoingGame: gameDocId,
+    historicalScores
   });
 };
 

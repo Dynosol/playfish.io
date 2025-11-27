@@ -15,6 +15,9 @@ const CreateGamePage: React.FC = () => {
     
     if (!user || !lobbyName.trim()) return;
     
+    const allowed = [4,6,8];
+    const sanitizedMax = allowed.includes(maxPlayers) ? maxPlayers : 4;
+
     setCreating(true);
     
     try {
@@ -53,7 +56,7 @@ const CreateGamePage: React.FC = () => {
         
         <div>
           <label>
-            Max Players:
+            Number of Players:
             <select
               value={maxPlayers}
               onChange={(e) => setMaxPlayers(Number(e.target.value))}
@@ -61,6 +64,7 @@ const CreateGamePage: React.FC = () => {
             >
               <option value={4}>4</option>
               <option value={6}>6</option>
+              <option value={8}>8</option>
             </select>
           </label>
         </div>

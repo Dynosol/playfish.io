@@ -14,9 +14,10 @@ import {
   isPlayerAlive,
   startDeclaration,
   finishDeclaration,
+  voteForReplay,
   type Card
 } from '../firebase/gameService';
-import { subscribeToLobby } from '../firebase/lobbyService';
+import { subscribeToLobby, returnToLobby, replayGame } from '../firebase/lobbyService';
 import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
 import ChatBox from '../components/ChatBox';
@@ -152,6 +153,7 @@ const GamePage: React.FC = () => {
   const canAskForCard = (): boolean => {
     if (!isPlayer || !selectedOpponent) return false;
     if (game.declarePhase?.active) return false;
+    if (isGameOver) return false;
 
     const cardHalfSuit = getHalfSuitFromCard(selectedSuit, selectedRank);
 
@@ -229,6 +231,43 @@ const GamePage: React.FC = () => {
     'low-diamonds', 'high-diamonds', 'low-clubs', 'high-clubs'
   ];
   const availableHalfSuits = allHalfSuits.filter(hs => !game.completedHalfsuits.includes(hs));
+  const isGameOver = game.gameOver?.winner !== null && game.gameOver?.winner !== undefined;
+  const winningTeam = game.gameOver?.winner ?? null;
+  const historicalScores = lobby?.historicalScores || { 0: 0, 1: 0 };
+  const isHost = lobby?.createdBy === user?.uid;
+  const nonHostPlayers = game.players.filter(p => p !== lobby?.createdBy);
+  const replayVoteCount = game.replayVotes?.filter(v => nonHostPlayers.includes(v)).length || 0;
+  const hasVotedForReplay = game.replayVotes?.includes(user?.uid || '') || false;
+
+  const handleReturnToLobby = async () => {
+    if (!gameId) return;
+    try {
+      await returnToLobby(gameId);
+    } catch (error) {
+      console.error('Failed to return to lobby:', error);
+    }
+  };
+
+  const handleReplay = async () => {
+    if (!gameId || !isHost) return;
+    try {
+      await replayGame(gameId);
+    } catch (error) {
+      console.error('Failed to replay game:', error);
+    }
+  };
+
+  const handleVoteForReplay = async () => {
+    if (!game || !user || hasVotedForReplay) return;
+    try {
+      const result = await voteForReplay(game.id, user.uid);
+      if (!result.success && result.error) {
+        console.error('Failed to vote for replay:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to vote for replay:', error);
+    }
+  };
 
   return (
     <div>
@@ -236,18 +275,87 @@ const GamePage: React.FC = () => {
         <h1>Game: {lobby.name}</h1>
         <Link to="/">Back to Home</Link>
 
-        <div>
-          <h2>
-            {isInDeclarePhase 
-              ? `Declaration Phase - ${game.declarePhase?.declareeId === user?.uid ? 'Your' : usernames.get(game.declarePhase?.declareeId || '') || 'Player'}'s Declaration`
-              : isMyTurn ? "It's Your Turn!" : `It is ${currentTurnPlayerName}'s turn.`}
-          </h2>
-        </div>
+        {isGameOver && winningTeam !== null ? (
+          <div>
+            <h2>TEAM {winningTeam === 0 ? '1' : '2'} WINS!</h2>
+            <div>
+              <h3>Winning Team Members:</h3>
+              <ul>
+                {getTeamPlayers(game, winningTeam as 0 | 1).map(playerId => {
+                  const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                  const isCurrentUser = playerId === user?.uid;
+                  return (
+                    <li key={playerId}>
+                      {isCurrentUser ? 'You' : playerUsername}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div>
+              <h3>Game History</h3>
+              <div>
+                <h4>Turns</h4>
+                <ul>
+                  {game.turns.map((turn, index) => {
+                    const askerName = usernames.get(turn.askerId) || `Player ${turn.askerId.slice(0, 16)}`;
+                    const targetName = usernames.get(turn.targetId) || `Player ${turn.targetId.slice(0, 16)}`;
+                    return (
+                      <li key={index}>
+                        {askerName} asked {targetName} for {turn.card.rank} of {turn.card.suit} - {turn.success ? 'Success' : 'Failed'}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div>
+                <h4>Declarations</h4>
+                <ul>
+                  {game.declarations.map((declaration, index) => {
+                    const declareeName = usernames.get(declaration.declareeId) || `Player ${declaration.declareeId.slice(0, 16)}`;
+                    return (
+                      <li key={index}>
+                        {declareeName} declared {declaration.halfSuit} for Team {declaration.team === 0 ? '1' : '2'} - {declaration.correct ? 'Correct' : 'Incorrect'}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+            <div>
+              {isHost ? (
+                <button onClick={handleReplay}>
+                  Replay {nonHostPlayers.length > 0 ? `(${replayVoteCount}/${nonHostPlayers.length})` : ''}
+                </button>
+              ) : (
+                <button onClick={handleVoteForReplay} disabled={hasVotedForReplay}>
+                  {hasVotedForReplay ? 'Voted for Replay' : 'Vote for Replay'}
+                </button>
+              )}
+              <button onClick={handleReturnToLobby}>Back to Lobby</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h2>
+              {isInDeclarePhase 
+                ? `Declaration Phase - ${game.declarePhase?.declareeId === user?.uid ? 'Your' : usernames.get(game.declarePhase?.declareeId || '') || 'Player'}'s Declaration`
+                : isMyTurn ? "It's Your Turn!" : `It is ${currentTurnPlayerName}'s turn.`}
+            </h2>
+          </div>
+        )}
 
         <div>
           <h3>Scores</h3>
           <div>Team 1: {game.scores?.[0] || 0}</div>
           <div>Team 2: {game.scores?.[1] || 0}</div>
+          {historicalScores && (historicalScores[0] > 0 || historicalScores[1] > 0) && (
+            <div>
+              <h4>Historical Scores</h4>
+              <div>Team 1: {historicalScores[0]}</div>
+              <div>Team 2: {historicalScores[1]}</div>
+            </div>
+          )}
         </div>
 
         {game.completedHalfsuits && game.completedHalfsuits.length > 0 && (
@@ -265,7 +373,7 @@ const GamePage: React.FC = () => {
           </div>
         )}
 
-        {isPlayer && isMyTurn && !isInDeclarePhase && (
+        {isPlayer && isMyTurn && !isInDeclarePhase && !isGameOver && (
           <div>
             <h3>Ask for a Card</h3>
 
@@ -345,7 +453,7 @@ const GamePage: React.FC = () => {
           </div>
         )}
 
-        {isPlayer && !isInDeclarePhase && isPlayerAlive(game, user.uid) && (
+        {isPlayer && !isInDeclarePhase && !isGameOver && isPlayerAlive(game, user.uid) && (
           <div>
             <button onClick={handleDeclare} disabled={isDeclaring}>
               {isDeclaring ? 'Starting Declaration...' : 'Declare'}
@@ -358,7 +466,7 @@ const GamePage: React.FC = () => {
           </div>
         )}
 
-        {isInDeclarePhase && isDeclaree && (
+        {isInDeclarePhase && !isGameOver && isDeclaree && (
           <div>
             <h3>Declaration Phase</h3>
             
@@ -454,7 +562,7 @@ const GamePage: React.FC = () => {
           </div>
         )}
 
-        {isInDeclarePhase && !isDeclaree && (
+        {isInDeclarePhase && !isGameOver && !isDeclaree && (
           <div>
             <h3>Declaration in Progress</h3>
             <div>
