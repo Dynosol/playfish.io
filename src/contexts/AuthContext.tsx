@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { auth } from '../firebase/config';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { createOrUpdateUser, updateUserLastOnline } from '../firebase/userService';
+import { createOrUpdateUser, updateUserLogoffTime } from '../firebase/userService';
 
 interface AuthContextType {
   user: User | null;
@@ -13,38 +13,33 @@ const AuthContext = createContext<AuthContextType>({ user: null, loading: true }
 
 export const useAuth = () => useContext(AuthContext);
 
-const HEARTBEAT_INTERVAL_MS = 30000;
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const previousUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (previousUserIdRef.current && !currentUser) {
+        try {
+          await updateUserLogoffTime(previousUserIdRef.current);
+        } catch (error) {
+          console.error('Failed to update logoff time:', error);
+        }
+        previousUserIdRef.current = null;
       }
 
-      if (!user) {
+      if (!currentUser) {
         try {
           await signInAnonymously(auth);
         } catch (error) {
           console.error('Failed to sign in anonymously:', error);
         }
       } else {
-        setUser(user);
+        previousUserIdRef.current = currentUser.uid;
+        setUser(currentUser);
         try {
-          await createOrUpdateUser(user.uid);
-          
-          heartbeatIntervalRef.current = setInterval(async () => {
-            try {
-              await updateUserLastOnline(user.uid);
-            } catch (error) {
-              console.error('Failed to update last online:', error);
-            }
-          }, HEARTBEAT_INTERVAL_MS);
+          await createOrUpdateUser(currentUser.uid);
         } catch (error) {
           console.error('Failed to create/update user document:', error);
         }
@@ -54,8 +49,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       unsubscribe();
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
+      if (previousUserIdRef.current) {
+        updateUserLogoffTime(previousUserIdRef.current).catch(error => {
+          console.error('Failed to update logoff time on unmount:', error);
+        });
       }
     };
   }, []);

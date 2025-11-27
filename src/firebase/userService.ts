@@ -22,14 +22,17 @@ export interface UserDocument {
   lastOnline: Date;
 }
 
+const ONLINE_SENTINEL = Timestamp.fromMillis(0);
+
 export const createOrUpdateUser = async (uid: string): Promise<void> => {
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
   
   if (userSnap.exists()) {
+    const existingData = userSnap.data();
     await setDoc(userRef, {
       updatedAt: serverTimestamp(),
-      lastOnline: serverTimestamp()
+      ...(existingData?.lastOnline === undefined ? { lastOnline: ONLINE_SENTINEL } : {})
     }, { merge: true });
   } else {
     const username = generateUsername();
@@ -39,7 +42,7 @@ export const createOrUpdateUser = async (uid: string): Promise<void> => {
       currentLobbyId: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      lastOnline: serverTimestamp()
+      lastOnline: ONLINE_SENTINEL
     });
   }
 };
@@ -78,7 +81,7 @@ export const getUser = async (uid: string): Promise<UserDocument | null> => {
   return null;
 };
 
-export const updateUserLastOnline = async (uid: string): Promise<void> => {
+export const updateUserLogoffTime = async (uid: string): Promise<void> => {
   const userRef = doc(db, 'users', uid);
   await setDoc(userRef, {
     lastOnline: serverTimestamp()
@@ -104,7 +107,7 @@ export const getOnlineUsers = async (onlineThresholdMinutes: number = 2): Promis
   const thresholdTime = Timestamp.fromMillis(Date.now() - onlineThresholdMinutes * 60 * 1000);
   const usersQuery = query(
     collection(db, 'users'),
-    where('lastOnline', '>=', thresholdTime)
+    where('lastOnline', '<', thresholdTime)
   );
   
   const snapshot = await getDocs(usersQuery);
@@ -120,35 +123,13 @@ export const subscribeToOnlineUsers = (
   const thresholdTime = Timestamp.fromMillis(Date.now() - onlineThresholdMinutes * 60 * 1000);
   const usersQuery = query(
     collection(db, 'users'),
-    where('lastOnline', '>=', thresholdTime)
+    where('lastOnline', '<', thresholdTime)
   );
   
   return onSnapshot(usersQuery, (snapshot) => {
-    const now = Date.now();
-    const thresholdMs = onlineThresholdMinutes * 60 * 1000;
-    
-    const usersList = snapshot.docs
-      .map(doc => {
-        const data = doc.data();
-        const lastOnline = data.lastOnline;
-        let lastOnlineMs: number;
-        
-        if (lastOnline instanceof Timestamp) {
-          lastOnlineMs = lastOnline.toMillis();
-        } else if (lastOnline?.toMillis) {
-          lastOnlineMs = lastOnline.toMillis();
-        } else if (lastOnline instanceof Date) {
-          lastOnlineMs = lastOnline.getTime();
-        } else {
-          return null;
-        }
-        
-        if (now - lastOnlineMs <= thresholdMs) {
-          return { ...data } as UserDocument;
-        }
-        return null;
-      })
-      .filter((user): user is UserDocument => user !== null);
+    const usersList = snapshot.docs.map(doc => ({
+      ...doc.data()
+    } as UserDocument));
     
     callback(usersList);
   });

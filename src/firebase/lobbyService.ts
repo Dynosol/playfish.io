@@ -10,7 +10,6 @@ import {
   arrayRemove,
   serverTimestamp,
   getDoc,
-  getDocs,
   deleteDoc,
   setDoc
 } from 'firebase/firestore';
@@ -81,41 +80,53 @@ const moveLobbyToDeleted = async (lobbyId: string, lobbyData: Lobby): Promise<vo
   await deleteDoc(doc(db, 'lobbies', lobbyId));
 };
 
-const leaveAllOtherLobbies = async (userId: string, excludeLobbyId?: string): Promise<void> => {
-  const lobbiesQuery = query(
-    collection(db, 'lobbies'),
-    where('players', 'array-contains', userId)
-  );
+const leaveCurrentLobby = async (userId: string, excludeLobbyId?: string): Promise<void> => {
+  const userRef = doc(db, 'users', userId);
+  const userSnap = await getDoc(userRef);
   
-  const snapshot = await getDocs(lobbiesQuery);
-  const updatePromises = snapshot.docs
-    .filter(doc => doc.id !== excludeLobbyId)
-    .map(async (doc) => {
-      const lobbyData = doc.data() as Lobby;
-      const updatedPlayers = lobbyData.players.filter(playerId => playerId !== userId);
-      const isHost = lobbyData.createdBy === userId;
-      
-      if (updatedPlayers.length === 0) {
-        await moveLobbyToDeleted(doc.id, lobbyData);
-      } else {
-        const updatedTeams = { ...lobbyData.teams };
-        delete updatedTeams[userId];
-        
-        const updateData = {
-          players: arrayRemove(userId),
-          teams: updatedTeams,
-          ...(isHost && updatedPlayers.length > 0 ? { createdBy: updatedPlayers[0] } : {})
-        };
-        
-        await updateDoc(doc.ref, updateData as never);
-      }
-    });
+  if (!userSnap.exists()) {
+    return;
+  }
   
-  await Promise.all(updatePromises);
+  const userData = userSnap.data();
+  const currentLobbyId = userData?.currentLobbyId;
+  
+  if (!currentLobbyId || currentLobbyId === excludeLobbyId) {
+    return;
+  }
+  
+  const lobbyRef = doc(db, 'lobbies', currentLobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+  
+  if (!lobbySnap.exists()) {
+    await updateUserCurrentLobby(userId, null);
+    return;
+  }
+  
+  const lobbyData = lobbySnap.data() as Lobby;
+  const updatedPlayers = lobbyData.players.filter(playerId => playerId !== userId);
+  const isHost = lobbyData.createdBy === userId;
+  
+  if (updatedPlayers.length === 0) {
+    await moveLobbyToDeleted(currentLobbyId, lobbyData);
+  } else {
+    const updatedTeams = { ...lobbyData.teams };
+    delete updatedTeams[userId];
+    
+    const updateData = {
+      players: arrayRemove(userId),
+      teams: updatedTeams,
+      ...(isHost && updatedPlayers.length > 0 ? { createdBy: updatedPlayers[0] } : {})
+    };
+    
+    await updateDoc(lobbyRef, updateData as never);
+  }
+  
+  await updateUserCurrentLobby(userId, null);
 };
 
 export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> => {
-  await leaveAllOtherLobbies(lobbyData.createdBy);
+  await leaveCurrentLobby(lobbyData.createdBy);
   
   const docRef = await addDoc(collection(db, 'lobbies'), {
     ...lobbyData,
@@ -155,11 +166,9 @@ export const joinLobby = async (lobbyId: string, userId: string): Promise<void> 
     throw new Error('Lobby is not accepting new players');
   }
   
-  await leaveAllOtherLobbies(userId, lobbyId);
+  await leaveCurrentLobby(userId, lobbyId);
   
-  const lobbyDoc = await getDoc(lobbyRef);
-  const currentLobbyData = lobbyDoc.data() as Lobby;
-  const updatedTeams = { ...currentLobbyData.teams, [userId]: null };
+  const updatedTeams = { ...lobbyData.teams, [userId]: null };
   
   await updateDoc(lobbyRef, {
     players: arrayUnion(userId),
@@ -256,8 +265,18 @@ export const swapPlayerTeam = async (lobbyId: string, playerId: string): Promise
 };
 
 export const areTeamsEven = (lobby: Lobby): boolean => {
-  const team0Count = lobby.players.filter(playerId => lobby.teams[playerId] === 0).length;
-  const team1Count = lobby.players.filter(playerId => lobby.teams[playerId] === 1).length;
+  let team0Count = 0;
+  let team1Count = 0;
+  
+  for (const playerId of lobby.players) {
+    const team = lobby.teams[playerId];
+    if (team === 0) {
+      team0Count++;
+    } else if (team === 1) {
+      team1Count++;
+    }
+  }
+  
   return team0Count === team1Count && team0Count > 0;
 };
 

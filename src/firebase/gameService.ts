@@ -194,7 +194,13 @@ export const getPlayerHand = (game: Game, playerId: string): Card[] => {
 };
 
 export const getTeamPlayers = (game: Game, team: 0 | 1): string[] => {
-  return game.players.filter(playerId => game.teams[playerId] === team);
+  const teamPlayers: string[] = [];
+  for (const playerId of game.players) {
+    if (game.teams[playerId] === team) {
+      teamPlayers.push(playerId);
+    }
+  }
+  return teamPlayers;
 };
 
 export const getPlayerTeam = (game: Game, playerId: string): 0 | 1 | undefined => {
@@ -215,7 +221,13 @@ export const getOpponents = (game: Game, playerId: string): string[] => {
   const playerTeam = game.teams[playerId];
   if (playerTeam === undefined) return [];
 
-  return game.players.filter(id => id !== playerId && game.teams[id] !== playerTeam);
+  const opponents: string[] = [];
+  for (const id of game.players) {
+    if (id !== playerId && game.teams[id] !== playerTeam) {
+      opponents.push(id);
+    }
+  }
+  return opponents;
 };
 
 // Main function to ask for a card
