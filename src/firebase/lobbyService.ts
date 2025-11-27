@@ -282,7 +282,7 @@ export const areTeamsEven = (lobby: Lobby): boolean => {
   return team0Count === team1Count && team0Count > 0;
 };
 
-export const randomizeTeams = async (lobbyId: string, playerId: string): Promise<void> => { 
+export const randomizeTeams = async (lobbyId: string, _playerId: string): Promise<void> => { 
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbySnap = await getDoc(lobbyRef);
   

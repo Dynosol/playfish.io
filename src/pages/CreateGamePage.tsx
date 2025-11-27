@@ -24,7 +24,7 @@ const CreateGamePage: React.FC = () => {
       const lobbyId = await createLobby({
         name: lobbyName,
         createdBy: user.uid,
-        maxPlayers: maxPlayers
+        maxPlayers: sanitizedMax
       });
       console.log('Lobby created with ID:', lobbyId);
       navigate(`/lobby/${lobbyId}`);
