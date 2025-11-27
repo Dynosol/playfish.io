@@ -583,28 +583,63 @@ const GamePage: React.FC = () => {
       {isPlayer && playerHand.length > 0 && (
         <div
           className={cn(
-            "fixed bottom-0 left-1/2 z-30 flex items-end justify-center px-4 pb-4",
+            "fixed bottom-0 left-1/2 z-30 flex justify-center",
             isMyTurn && "ring-4 ring-green-500 rounded-t-lg ring-offset-2 ring-offset-background"
           )}
-          style={{ transform: 'translateX(-50%)' }}
+          style={{ 
+            transform: 'translateX(-50%)',
+            width: `${Math.min(Math.max(playerHand.length * 30, 200), 800)}px`,
+            height: '140px'
+          }}
         >
           {playerHand.map((card, index) => {
             const totalCards = playerHand.length;
-            const maxRotation = Math.min(totalCards * 3, 30);
-            const rotationStep = totalCards > 1 ? (maxRotation * 2) / (totalCards - 1) : 0;
-            const rotation = -maxRotation + (index * rotationStep);
-            const offsetX = (index - (totalCards - 1) / 2) * 16;
-            const offsetY = Math.abs(rotation) * 0.5;
+            const radius = 1500; // Radius of the circle
+            const angleStep = 2; // Degrees between cards
+            const startAngle = -((totalCards - 1) * angleStep) / 2;
             
+            // Add extra rotation based on index to complement the vertical offset
+            const indexRotation = index * 0.5; 
+            const rotation = startAngle + (index * angleStep) + indexRotation;
+            
+            // Increasing vertical offset for each card
+            const translateY = index * 5;
+
+            // Calculate the X offset caused by the rotation to center the fan
+            // We want the center of the fan (average X position) to be at 0
+            // For a given card i, x_i ≈ radius * sin(rotation_i)
+            // Average x ≈ (1/N) * Σ(radius * sin(rotation_i))
+            // We need to shift everything left by Average x
+            
+            // Approximate calculation for the shift needed:
+            // Calculate rotation of first and last card
+            const firstCardRotation = startAngle; // index 0
+            const lastCardRotation = startAngle + ((totalCards - 1) * angleStep) + ((totalCards - 1) * 0.5);
+            
+            // The "visual center" rotation is the average of first and last
+            const centerRotation = (firstCardRotation + lastCardRotation) / 2;
+            
+            // We need to counteract this rotation to center the fan
+            // Shift the transform origin point horizontally? No, easier to shift the container or the cards.
+            // Shifting the cards by rotating the whole system by -centerRotation is the most geometrically correct way
+            // But we want to keep the specific individual rotations requested.
+            // Instead, let's calculate the horizontal displacement caused by 'centerRotation' at 'radius'
+            // x_offset = radius * sin(centerRotation)
+            
+            const centerOffsetRadians = (centerRotation * Math.PI) / 180;
+            const xOffset = radius * Math.sin(centerOffsetRadians);
+
             return (
               <div
                 key={index}
-                className="transition-all duration-200 cursor-pointer hover:translate-y-[-20px] hover:z-40"
+                className="absolute transition-all duration-200 cursor-pointer hover:translate-y-[-20px] hover:z-40"
                 style={{
-                  transform: `rotate(${rotation}deg) translateX(${offsetX}px) translateY(${offsetY}px)`,
-                  transformOrigin: 'center bottom',
-                  position: 'relative',
-                  zIndex: index
+                  left: '50%',
+                  bottom: '-30px', // Translate cards downward
+                  marginLeft: `calc(-45px - ${xOffset}px)`, // Adjust left margin to center the fan
+                  transformOrigin: `50% ${radius}px`,
+                  transform: `rotate(${rotation}deg) translateY(-${translateY}px)`,
+                  zIndex: index,
                 }}
               >
                 <CardImage card={card} width={90} height={126} />
