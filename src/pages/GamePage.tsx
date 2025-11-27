@@ -6,6 +6,7 @@ import {
   subscribeToGame,
   getPlayerHand,
   getTeamPlayers,
+  getOpponents,
   askForCard,
   belongsToHalfSuit,
   getHalfSuitFromCard,
@@ -137,12 +138,10 @@ const GamePage: React.FC = () => {
   const playerHand = isPlayer ? getPlayerHand(game, user.uid) : [];
   const isMyTurn = isPlayer && game.currentTurn === user.uid;
 
-  const allPlayers = game.players;
-  const myIndex = user ? allPlayers.indexOf(user.uid) : -1;
-  const orderedPlayers = myIndex >= 0 
-    ? [...allPlayers.slice(myIndex + 1), ...allPlayers.slice(0, myIndex)]
+  const opponents = isPlayer && user ? getOpponents(game, user.uid) : [];
+  const allOtherPlayers = isPlayer && user 
+    ? game.players.filter(playerId => playerId !== user.uid)
     : [];
-  const opponents = orderedPlayers;
 
   const allSuits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
   const allRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
@@ -292,14 +291,14 @@ const GamePage: React.FC = () => {
   const getOpponentPosition = (index: number, total: number) => {
     if (total === 0) return { left: '50%', top: '50%' };
     if (total === 1) {
-      return { left: '50%', top: '15%' };
+      return { left: '50%', top: '35%' };
     }
-    const step = 180 / (total - 1);
-    const angleDeg = 180 + (index * step);
+    const step = 120 / (total - 1);
+    const angleDeg = 210 + (index * step);
     const angleRad = (angleDeg * Math.PI) / 180;
-    const radius = 35;
+    const radius = 20;
     const centerX = 50;
-    const centerY = 40;
+    const centerY = 45;
     const x = centerX + radius * Math.cos(angleRad);
     const y = centerY + radius * Math.sin(angleRad);
     return { left: `${x}%`, top: `${y}%` };
@@ -367,29 +366,32 @@ const GamePage: React.FC = () => {
         </div>
       ) : (
         <>
-          {opponents.map((opponentId, index) => {
-            const position = getOpponentPosition(index, opponents.length);
-            const isCurrentTurn = game.currentTurn === opponentId;
-            const opponentUsername = usernames.get(opponentId) || `Player ${opponentId.slice(0, 16)}`;
-            const handSize = game.playerHands[opponentId]?.length || 0;
+          {allOtherPlayers.map((playerId, index) => {
+            const position = getOpponentPosition(index, allOtherPlayers.length);
+            const isCurrentTurn = game.currentTurn === playerId;
+            const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+            const handSize = game.playerHands[playerId]?.length || 0;
+            const isOpponent = opponents.includes(playerId);
+            const isClickable = isMyTurn && !isInDeclarePhase && isOpponent;
             
             return (
               <div
-                key={opponentId}
+                key={playerId}
                 className="absolute z-20 flex flex-col items-center"
                 style={{ left: position.left, top: position.top, transform: 'translate(-50%, -50%)' }}
               >
                 <div
                   className={cn(
                     "w-16 h-16 rounded-full bg-muted border-4 flex items-center justify-center transition-all",
-                    isCurrentTurn ? "border-green-500 shadow-lg shadow-green-500/50" : "border-border"
+                    isCurrentTurn ? "border-green-500 shadow-lg shadow-green-500/50" : "border-border",
+                    isClickable ? "cursor-pointer hover:bg-muted/80" : "cursor-not-allowed opacity-60"
                   )}
-                  onClick={() => isMyTurn && !isInDeclarePhase && setSelectedOpponent(opponentId)}
+                  onClick={() => isClickable && setSelectedOpponent(playerId)}
                 >
                   <User className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div className="mt-2 text-center">
-                  <div className="text-xs font-medium">{opponentUsername}</div>
+                  <div className="text-xs font-medium">{playerUsername}</div>
                   <Badge variant="secondary" className="text-[10px] mt-1">{handSize} cards</Badge>
                 </div>
               </div>
@@ -581,18 +583,34 @@ const GamePage: React.FC = () => {
       {isPlayer && playerHand.length > 0 && (
         <div
           className={cn(
-            "fixed bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-end justify-center gap-1 px-4 pb-2",
+            "fixed bottom-0 left-1/2 z-30 flex items-end justify-center px-4 pb-4",
             isMyTurn && "ring-4 ring-green-500 rounded-t-lg ring-offset-2 ring-offset-background"
           )}
+          style={{ transform: 'translateX(-50%)' }}
         >
-          {playerHand.map((card, index) => (
-            <div
-              key={index}
-              className="transition-transform duration-200 translate-y-1/2 hover:translate-y-0 cursor-pointer"
-            >
-              <CardImage card={card} width={60} height={84} />
-            </div>
-          ))}
+          {playerHand.map((card, index) => {
+            const totalCards = playerHand.length;
+            const maxRotation = Math.min(totalCards * 3, 30);
+            const rotationStep = totalCards > 1 ? (maxRotation * 2) / (totalCards - 1) : 0;
+            const rotation = -maxRotation + (index * rotationStep);
+            const offsetX = (index - (totalCards - 1) / 2) * 16;
+            const offsetY = Math.abs(rotation) * 0.5;
+            
+            return (
+              <div
+                key={index}
+                className="transition-all duration-200 cursor-pointer hover:translate-y-[-20px] hover:z-40"
+                style={{
+                  transform: `rotate(${rotation}deg) translateX(${offsetX}px) translateY(${offsetY}px)`,
+                  transformOrigin: 'center bottom',
+                  position: 'relative',
+                  zIndex: index
+                }}
+              >
+                <CardImage card={card} width={90} height={126} />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
