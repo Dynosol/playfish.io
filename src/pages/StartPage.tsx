@@ -1,10 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Gamepad2, Users } from 'lucide-react';
+
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser } from '../firebase/userService';
 import { subscribeToLobby, subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
 import type { UserDocument } from '../firebase/userService';
 import type { Lobby } from '../firebase/lobbyService';
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 
 const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -14,7 +24,7 @@ const StartPage: React.FC = () => {
   const [loadingLobbies, setLoadingLobbies] = useState(true);
   const [joining, setJoining] = useState<string | null>(null);
   const [lobbyName, setLobbyName] = useState('');
-  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [maxPlayers, setMaxPlayers] = useState<string>("4");
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
 
@@ -61,7 +71,7 @@ const StartPage: React.FC = () => {
       const lobbyId = await createLobby({
         name: lobbyName,
         createdBy: user.uid,
-        maxPlayers: maxPlayers
+        maxPlayers: parseInt(maxPlayers)
       });
       navigate(`/lobby/${lobbyId}`);
     } catch (error) {
@@ -93,120 +103,179 @@ const StartPage: React.FC = () => {
   };
 
   if (authLoading) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
   return (
-    <div>
-      <h1>Fish</h1>
-      <p>Welcome, {userDoc?.username ?? 'Loading username...'}</p>
-      <nav>
-        <ul>
-          <li><Link to="/settings">Settings</Link></li>
-        </ul>
-      </nav>
-
-      {currentLobby && (
-        <div>
-          <p>
-            {currentLobby.status === 'playing' 
-              ? `You are currently playing in the game "${currentLobby.name}"`
-              : `You are currently waiting in game "${currentLobby.name}"`}
-          </p>
-          {currentLobby.status === 'playing' ? (
-            <Link to={`/game/${currentLobby.id}`}>Go to Game</Link>
-          ) : (
-            <Link to={`/lobby/${currentLobby.id}`}>Go to Lobby</Link>
-          )}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="border-b">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-xl">
+            <Gamepad2 className="h-6 w-6" />
+            <span>playfish.io</span>
+          </div>
+          
+          <div className="text-lg font-medium">
+            Welcome, {userDoc?.username ?? 'Player'}
+          </div>
+          
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">Settings</span>
+          </Button>
         </div>
-      )}
+      </header>
 
-      <div>
-        <h2>Create Lobby</h2>
-        <form onSubmit={handleCreateLobby}>
-          <div>
-            <label>
-              Lobby Name:
-              <input
-                type="text"
-                value={lobbyName}
-                onChange={(e) => setLobbyName(e.target.value)}
-                required
-                disabled={creating}
-              />
-            </label>
-          </div>
-          
-          <div>
-            <label>
-              Number of Players:
-              <select
-                value={maxPlayers}
-                onChange={(e) => setMaxPlayers(Number(e.target.value))}
-                disabled={creating}
-              >
-                <option value={4}>4</option>
-                <option value={6}>6</option>
-                <option value={8}>8</option>
-              </select>
-            </label>
-          </div>
-          
-          <button type="submit" disabled={creating || !lobbyName.trim()}>
-            {creating ? 'Creating...' : 'Create Lobby'}
-          </button>
-        </form>
-      </div>
-
-      <div>
-        <h2>Join Lobby</h2>
-        {loadingLobbies ? (
-          <p>Loading lobbies...</p>
-        ) : lobbies.length === 0 ? (
-          <p>No active lobbies found.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Lobby Name</th>
-                <th>Players</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lobbies.map(lobby => {
-                const isFull = (lobby.players?.length || 0) >= (lobby.maxPlayers || 4);
-                const canJoin = !isFull && lobby.status === 'waiting';
-                
-                return (
-                  <tr key={lobby.id}>
-                    <td>{lobby.name}</td>
-                    <td>{lobby.players?.length || 0}/{lobby.maxPlayers || 4}</td>
-                    <td>{lobby.status}</td>
-                    <td>
-                      {canJoin ? (
-                        <button 
-                          onClick={() => handleJoinGame(lobby.id)}
-                          disabled={joining === lobby.id}
-                        >
-                          {joining === lobby.id ? 'Joining...' : 'Join'}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleSpectate(lobby.id, lobby.status)}
-                        >
-                          Spectate
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <main className="flex-1 container mx-auto px-4 py-8">
+        {/* Current Game Banner */}
+        {currentLobby && (
+          <Card className="mb-8 bg-primary/5 border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Gamepad2 className="h-5 w-5 text-primary" />
+                Active Session
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {currentLobby.status === 'playing' 
+                    ? "You are currently in an active game."
+                    : "You are currently in a lobby."}
+                </p>
+                <p className="font-medium">{currentLobby.name}</p>
+              </div>
+              <Button onClick={() => navigate(currentLobby.status === 'playing' ? `/game/${currentLobby.id}` : `/lobby/${currentLobby.id}`)}>
+                Return to {currentLobby.status === 'playing' ? 'Game' : 'Lobby'}
+              </Button>
+            </CardContent>
+          </Card>
         )}
-      </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Center: Lobby List */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold tracking-tight">Open Lobbies</h2>
+            </div>
+            
+            <Card>
+              <CardContent className="p-0">
+                {loadingLobbies ? (
+                  <div className="p-8 text-center text-muted-foreground">Loading lobbies...</div>
+                ) : lobbies.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No active lobbies found. Create one to get started!
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Lobby Name</TableHead>
+                        <TableHead>Players</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lobbies.map(lobby => {
+                        const isFull = (lobby.players?.length || 0) >= (lobby.maxPlayers || 4);
+                        const canJoin = !isFull && lobby.status === 'waiting';
+                        
+                        return (
+                          <TableRow key={lobby.id}>
+                            <TableCell className="font-medium">{lobby.name}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
+                                {lobby.status === 'waiting' ? 'Waiting' : 'In Progress'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {canJoin ? (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleJoinGame(lobby.id)}
+                                  disabled={joining === lobby.id}
+                                >
+                                  {joining === lobby.id ? 'Joining...' : 'Join'}
+                                </Button>
+                              ) : (
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary"
+                                  onClick={() => handleSpectate(lobby.id, lobby.status)}
+                                >
+                                  Spectate
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Center: Create Game */}
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold tracking-tight">Create Game</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>New Lobby</CardTitle>
+                <CardDescription>Set up a new game room for you and your friends.</CardDescription>
+              </CardHeader>
+              <form onSubmit={handleCreateLobby}>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lobbyName">Lobby Name</Label>
+                    <Input
+                      id="lobbyName"
+                      placeholder="Enter lobby name"
+                      value={lobbyName}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyName(e.target.value)}
+                      required
+                      disabled={creating}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="maxPlayers">Max Players</Label>
+                    <Select 
+                      value={maxPlayers} 
+                      onValueChange={setMaxPlayers}
+                      disabled={creating}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select players" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="4">4 Players</SelectItem>
+                        <SelectItem value="6">6 Players</SelectItem>
+                        <SelectItem value="8">8 Players</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button className="w-full" type="submit" disabled={creating || !lobbyName.trim()}>
+                    {creating ? 'Creating...' : 'Create Lobby'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

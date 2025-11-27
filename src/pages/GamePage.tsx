@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Gamepad2, User, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   subscribeToGame,
   getPlayerHand,
   getTeamPlayers,
-  getOpponents,
   askForCard,
   belongsToHalfSuit,
   getHalfSuitFromCard,
@@ -22,6 +22,13 @@ import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
 import ChatBox from '../components/ChatBox';
 import { useUsernames } from '../hooks/useUsername';
+import CardImage from '../components/CardImage';
+import { Button } from "@/components/ui/button";
+import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -29,6 +36,7 @@ const GamePage: React.FC = () => {
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const [selectedSuit, setSelectedSuit] = useState<Card['suit']>('spades');
@@ -86,44 +94,58 @@ const GamePage: React.FC = () => {
   const usernames = useUsernames(playersArray);
 
   if (loading) {
-    return <div>Loading game...</div>;
+    return <div className="flex items-center justify-center h-screen">Loading game...</div>;
   }
 
   if (!lobby) {
     return (
-      <div>
-        <h1>Lobby not found</h1>
-        <Link to="/join">Find another lobby</Link>
+      <div className="h-screen bg-background flex items-center justify-center">
+        <UICard>
+          <CardHeader>
+            <CardTitle>Lobby not found</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/')} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </CardContent>
+        </UICard>
       </div>
     );
   }
 
   if (!lobby.onGoingGame || !game) {
     return (
-      <div>
-        <h1>Game not started</h1>
-        <Link to={`/lobby/${gameId}`}>Back to Lobby</Link>
+      <div className="h-screen bg-background flex items-center justify-center">
+        <UICard>
+          <CardHeader>
+            <CardTitle>Game not started</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate(`/lobby/${gameId}`)} variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Lobby
+            </Button>
+          </CardContent>
+        </UICard>
       </div>
     );
   }
 
   const isPlayer = user && game.players.includes(user.uid);
   const playerHand = isPlayer ? getPlayerHand(game, user.uid) : [];
-  const currentTurnUsername = usernames.get(game.currentTurn) || `Player ${game.currentTurn.slice(0, 16)}`;
   const isMyTurn = isPlayer && game.currentTurn === user.uid;
-  const currentTurnPlayerName = game.currentTurn === user?.uid
-    ? 'You'
-    : currentTurnUsername;
 
-  const opponents = isPlayer ? getOpponents(game, user.uid) : [];
+  const allPlayers = game.players;
+  const myIndex = user ? allPlayers.indexOf(user.uid) : -1;
+  const orderedPlayers = myIndex >= 0 
+    ? [...allPlayers.slice(myIndex + 1), ...allPlayers.slice(0, myIndex)]
+    : [];
+  const opponents = orderedPlayers;
 
-  // Available ranks and suits
   const allSuits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
   const allRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
-
-  const myHalfSuits = isPlayer
-    ? Array.from(new Set(playerHand.map(card => card.halfSuit)))
-    : [];
 
   const handleAskForCard = async () => {
     if (!isPlayer || !game) return;
@@ -142,7 +164,6 @@ const GamePage: React.FC = () => {
     if (!result.success && result.error) {
       setErrorMessage(result.error);
     } else {
-      // Clear selections on success
       setSelectedOpponent('');
       setErrorMessage('');
     }
@@ -233,7 +254,6 @@ const GamePage: React.FC = () => {
   const availableHalfSuits = allHalfSuits.filter(hs => !game.completedHalfsuits.includes(hs));
   const isGameOver = game.gameOver?.winner !== null && game.gameOver?.winner !== undefined;
   const winningTeam = game.gameOver?.winner ?? null;
-  const historicalScores = lobby?.historicalScores || { 0: 0, 1: 0 };
   const isHost = lobby?.createdBy === user?.uid;
   const nonHostPlayers = game.players.filter(p => p !== lobby?.createdBy);
   const replayVoteCount = game.replayVotes?.filter(v => nonHostPlayers.includes(v)).length || 0;
@@ -269,349 +289,314 @@ const GamePage: React.FC = () => {
     }
   };
 
+  const getOpponentPosition = (index: number, total: number) => {
+    if (total === 0) return { left: '50%', top: '50%' };
+    if (total === 1) {
+      return { left: '50%', top: '15%' };
+    }
+    const step = 180 / (total - 1);
+    const angleDeg = 180 + (index * step);
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const radius = 35;
+    const centerX = 50;
+    const centerY = 40;
+    const x = centerX + radius * Math.cos(angleRad);
+    const y = centerY + radius * Math.sin(angleRad);
+    return { left: `${x}%`, top: `${y}%` };
+  };
+
   return (
-    <div>
-      <div>
-        <h1>Game: {lobby.name}</h1>
-        <Link to="/">Back to Home</Link>
-
-        {isGameOver && winningTeam !== null ? (
-          <div>
-            <h2>TEAM {winningTeam === 0 ? '1' : '2'} WINS!</h2>
-            <div>
-              <h3>Winning Team Members:</h3>
-              <ul>
-                {getTeamPlayers(game, winningTeam as 0 | 1).map(playerId => {
-                  const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                  const isCurrentUser = playerId === user?.uid;
-                  return (
-                    <li key={playerId}>
-                      {isCurrentUser ? 'You' : playerUsername}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-            <div>
-              <h3>Game History</h3>
-              <div>
-                <h4>Turns</h4>
-                <ul>
-                  {game.turns.map((turn, index) => {
-                    const askerName = usernames.get(turn.askerId) || `Player ${turn.askerId.slice(0, 16)}`;
-                    const targetName = usernames.get(turn.targetId) || `Player ${turn.targetId.slice(0, 16)}`;
-                    return (
-                      <li key={index}>
-                        {askerName} asked {targetName} for {turn.card.rank} of {turn.card.suit} - {turn.success ? 'Success' : 'Failed'}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-              <div>
-                <h4>Declarations</h4>
-                <ul>
-                  {game.declarations.map((declaration, index) => {
-                    const declareeName = usernames.get(declaration.declareeId) || `Player ${declaration.declareeId.slice(0, 16)}`;
-                    return (
-                      <li key={index}>
-                        {declareeName} declared {declaration.halfSuit} for Team {declaration.team === 0 ? '1' : '2'} - {declaration.correct ? 'Correct' : 'Incorrect'}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
-            <div>
-              {isHost ? (
-                <button onClick={handleReplay}>
-                  Replay {nonHostPlayers.length > 0 ? `(${replayVoteCount}/${nonHostPlayers.length})` : ''}
-                </button>
-              ) : (
-                <button onClick={handleVoteForReplay} disabled={hasVotedForReplay}>
-                  {hasVotedForReplay ? 'Voted for Replay' : 'Vote for Replay'}
-                </button>
-              )}
-              <button onClick={handleReturnToLobby}>Back to Lobby</button>
-            </div>
+    <div className="h-screen w-screen overflow-hidden bg-background relative">
+      <header className="absolute top-0 left-0 right-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="px-4 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <Gamepad2 className="h-4 w-4" />
+            <span>{lobby.name}</span>
           </div>
-        ) : (
-          <div>
-            <h2>
-              {isInDeclarePhase 
-                ? `Declaration Phase - ${game.declarePhase?.declareeId === user?.uid ? 'Your' : usernames.get(game.declarePhase?.declareeId || '') || 'Player'}'s Declaration`
-                : isMyTurn ? "It's Your Turn!" : `It is ${currentTurnPlayerName}'s turn.`}
-            </h2>
+          <div className="flex items-center gap-2 text-xs">
+            <span>Team 1: <strong>{game.scores?.[0] || 0}</strong></span>
+            <span>|</span>
+            <span>Team 2: <strong>{game.scores?.[1] || 0}</strong></span>
           </div>
-        )}
-
-        <div>
-          <h3>Scores</h3>
-          <div>Team 1: {game.scores?.[0] || 0}</div>
-          <div>Team 2: {game.scores?.[1] || 0}</div>
-          {historicalScores && (historicalScores[0] > 0 || historicalScores[1] > 0) && (
-            <div>
-              <h4>Historical Scores</h4>
-              <div>Team 1: {historicalScores[0]}</div>
-              <div>Team 2: {historicalScores[1]}</div>
-            </div>
-          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
         </div>
+      </header>
 
-        {game.completedHalfsuits && game.completedHalfsuits.length > 0 && (
-          <div>
-            <h3>Completed Halfsuits</h3>
-            <div>
-              {game.completedHalfsuits.join(', ')}
-            </div>
-          </div>
-        )}
-
-        {!isPlayer && (
-          <div>
-            <h2>YOU ARE SPECTATING</h2>
-          </div>
-        )}
-
-        {isPlayer && isMyTurn && !isInDeclarePhase && !isGameOver && (
-          <div>
-            <h3>Ask for a Card</h3>
-
-            <div>
-              <label>Select Opponent: </label>
-              <select
-                value={selectedOpponent}
-                onChange={(e) => setSelectedOpponent(e.target.value)}
-              >
-                <option value="">-- Select Opponent --</option>
-                {opponents.map(opponentId => {
-                  const opponentUsername = usernames.get(opponentId) || `Player ${opponentId.slice(0, 16)}`;
-                  return (
-                    <option key={opponentId} value={opponentId}>
-                      {opponentUsername} ({game.playerHands[opponentId]?.length || 0} cards)
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            <div>
-              <label>Select Suit: </label>
-              <select
-                value={selectedSuit}
-                onChange={(e) => setSelectedSuit(e.target.value as Card['suit'])}
-              >
-                {allSuits.map(suit => (
-                  <option key={suit} value={suit}>{suit}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label>Select Rank: </label>
-              <select
-                value={selectedRank}
-                onChange={(e) => setSelectedRank(e.target.value as Card['rank'])}
-              >
-                {allRanks.map(rank => (
-                  <option key={rank} value={rank}>{rank}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <p>
-                Your half-suits: {myHalfSuits.join(', ')}
-              </p>
-            </div>
-
-            <button
-              onClick={handleAskForCard}
-              disabled={!canAskForCard() || isAsking}
-            >
-              {isAsking ? 'Asking...' : 'Ask for Card'}
-            </button>
-
-            {errorMessage && (
-              <div>
-                {errorMessage}
-              </div>
-            )}
-          </div>
-        )}
-
-        {isPlayer && (
-          <div>
-            <h2>Your Hand ({playerHand.length} cards)</h2>
-            <div>
-              {playerHand.map((card, index) => (
-                <div key={index}>
-                  {card.rank} of {card.suit} ({card.halfSuit})
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isPlayer && !isInDeclarePhase && !isGameOver && isPlayerAlive(game, user.uid) && (
-          <div>
-            <button onClick={handleDeclare} disabled={isDeclaring}>
-              {isDeclaring ? 'Starting Declaration...' : 'Declare'}
-            </button>
-            {declareError && (
-              <div>
-                {declareError}
-              </div>
-            )}
-          </div>
-        )}
-
-        {isInDeclarePhase && !isGameOver && isDeclaree && (
-          <div>
-            <h3>Declaration Phase</h3>
-            
-            {!declarationHalfSuit && (
-              <div>
-                <h4>Step 1: Select Halfsuit</h4>
-                <div>
-                  {availableHalfSuits.map(halfSuit => (
-                    <button
-                      key={halfSuit}
-                      onClick={() => handleSelectHalfSuit(halfSuit)}
-                    >
-                      {halfSuit}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {declarationHalfSuit && declarationTeam === null && (
-              <div>
-                <h4>Step 2: Select Team</h4>
-                <div>
-                  Selected Halfsuit: {declarationHalfSuit}
-                </div>
-                <div>
-                  <button onClick={() => handleSelectTeam(0)}>
-                    Team 1
-                  </button>
-                  <button onClick={() => handleSelectTeam(1)}>
-                    Team 2
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {declarationHalfSuit && declarationTeam !== null && (
-              <div>
-                <h4>Step 3: Assign Cards</h4>
-                <div>
-                  Halfsuit: {declarationHalfSuit}
-                </div>
-                <div>
-                  Team: {declarationTeam === 0 ? 'Team 1' : 'Team 2'}
-                </div>
-                <div>
-                  {getAllCardsInHalfSuit(declarationHalfSuit).map(card => {
-                    const cardKey = getCardKey(card);
-                    const assignedPlayerId = declarationAssignments[cardKey];
-                    const teamPlayers = getTeamPlayers(game, declarationTeam);
-                    
-                    return (
-                      <div key={cardKey}>
-                        <span>{card.rank} of {card.suit}: </span>
-                        <select
-                          value={assignedPlayerId || ''}
-                          onChange={(e) => handleAssignCard(cardKey, e.target.value)}
-                        >
-                          <option value="">-- Select Player --</option>
-                          {teamPlayers.map(playerId => {
-                            const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                            const isCurrentUser = playerId === user?.uid;
-                            return (
-                              <option key={playerId} value={playerId}>
-                                {isCurrentUser ? 'You' : playerUsername}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div>
-                  <button
-                    onClick={handleFinishDeclaration}
-                    disabled={isDeclaring || !getAllCardsInHalfSuit(declarationHalfSuit).every(card => {
-                      const cardKey = getCardKey(card);
-                      return declarationAssignments[cardKey] !== undefined;
-                    })}
-                  >
-                    {isDeclaring ? 'Finishing...' : 'Finish Declaration'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {declareError && (
-              <div>
-                {declareError}
-              </div>
-            )}
-          </div>
-        )}
-
-        {isInDeclarePhase && !isGameOver && !isDeclaree && (
-          <div>
-            <h3>Declaration in Progress</h3>
-            <div>
-              {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} is making a declaration.
-              Please wait...
-            </div>
-          </div>
-        )}
-
-        <div>    
-          <div>
-            <h3>Team 1</h3>
-            <ul>
-              {getTeamPlayers(game, 0).map(playerId => {
-                const playerHandSize = game.playerHands[playerId]?.length || 0;
-                const isCurrentUser = playerId === user?.uid;
-                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                return (
-                  <li key={playerId}>
-                    {isCurrentUser ? 'You' : playerUsername} - {playerHandSize} cards
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <div>
-            <h3>Team 2</h3>
-            <ul>
-              {getTeamPlayers(game, 1).map(playerId => {
-                const playerHandSize = game.playerHands[playerId]?.length || 0;
-                const isCurrentUser = playerId === user?.uid;
-                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                return (
-                  <li key={playerId}>
-                    {isCurrentUser ? 'You' : playerUsername} - {playerHandSize} cards
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div>
+      <div className="absolute top-4 right-4 z-50">
         <ChatBox gameId={game.id} />
       </div>
+
+      {isGameOver && winningTeam !== null ? (
+        <div className="absolute inset-0 flex items-center justify-center z-30">
+          <UICard className="w-96">
+            <CardHeader>
+              <CardTitle className="text-2xl text-center">
+                TEAM {winningTeam === 0 ? '1' : '2'} WINS!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
+                <ul className="text-sm space-y-1">
+                  {getTeamPlayers(game, winningTeam as 0 | 1).map(playerId => {
+                    const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                    return (
+                      <li key={playerId}>{playerId === user?.uid ? 'You' : playerUsername}</li>
+                    );
+                  })}
+                </ul>
+              </div>
+              <div className="flex gap-2">
+                {isHost ? (
+                  <Button onClick={handleReplay} size="sm" className="flex-1">
+                    Replay {nonHostPlayers.length > 0 ? `(${replayVoteCount}/${nonHostPlayers.length})` : ''}
+                  </Button>
+                ) : (
+                  <Button onClick={handleVoteForReplay} disabled={hasVotedForReplay} size="sm" className="flex-1">
+                    {hasVotedForReplay ? 'Voted' : 'Vote Replay'}
+                  </Button>
+                )}
+                <Button onClick={handleReturnToLobby} variant="outline" size="sm">
+                  Back to Lobby
+                </Button>
+              </div>
+            </CardContent>
+          </UICard>
+        </div>
+      ) : (
+        <>
+          {opponents.map((opponentId, index) => {
+            const position = getOpponentPosition(index, opponents.length);
+            const isCurrentTurn = game.currentTurn === opponentId;
+            const opponentUsername = usernames.get(opponentId) || `Player ${opponentId.slice(0, 16)}`;
+            const handSize = game.playerHands[opponentId]?.length || 0;
+            
+            return (
+              <div
+                key={opponentId}
+                className="absolute z-20 flex flex-col items-center"
+                style={{ left: position.left, top: position.top, transform: 'translate(-50%, -50%)' }}
+              >
+                <div
+                  className={cn(
+                    "w-16 h-16 rounded-full bg-muted border-4 flex items-center justify-center transition-all",
+                    isCurrentTurn ? "border-green-500 shadow-lg shadow-green-500/50" : "border-border"
+                  )}
+                  onClick={() => isMyTurn && !isInDeclarePhase && setSelectedOpponent(opponentId)}
+                >
+                  <User className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="mt-2 text-center">
+                  <div className="text-xs font-medium">{opponentUsername}</div>
+                  <Badge variant="secondary" className="text-[10px] mt-1">{handSize} cards</Badge>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            {isInDeclarePhase && isDeclaree ? (
+              <UICard className="w-96 max-h-[80vh] overflow-y-auto">
+                <CardHeader>
+                  <CardTitle className="text-sm">Declaration Phase</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!declarationHalfSuit && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-sm">Step 1: Select Halfsuit</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {availableHalfSuits.map(halfSuit => (
+                          <Button
+                            key={halfSuit}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSelectHalfSuit(halfSuit)}
+                          >
+                            {halfSuit}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {declarationHalfSuit && declarationTeam === null && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-sm">Step 2: Select Team</h4>
+                      <div className="mb-2 text-xs text-muted-foreground">
+                        Halfsuit: {declarationHalfSuit}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={() => handleSelectTeam(0)} variant="outline" size="sm">
+                          Team 1
+                        </Button>
+                        <Button onClick={() => handleSelectTeam(1)} variant="outline" size="sm">
+                          Team 2
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {declarationHalfSuit && declarationTeam !== null && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-sm">Step 3: Assign Cards</h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {getAllCardsInHalfSuit(declarationHalfSuit).map(card => {
+                          const cardKey = getCardKey(card);
+                          const assignedPlayerId = declarationAssignments[cardKey];
+                          const teamPlayers = getTeamPlayers(game, declarationTeam);
+                          
+                          return (
+                            <div key={cardKey} className="flex items-center gap-2">
+                              <CardImage card={card} width={30} height={42} />
+                              <Select
+                                value={assignedPlayerId || ''}
+                                onValueChange={(value) => handleAssignCard(cardKey, value)}
+                              >
+                                <SelectTrigger className="h-8 text-xs flex-1">
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {teamPlayers.map(playerId => {
+                                    const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
+                                    return (
+                                      <SelectItem key={playerId} value={playerId} className="text-xs">
+                                        {playerId === user?.uid ? 'You' : playerUsername}
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        onClick={handleFinishDeclaration}
+                        disabled={isDeclaring || !getAllCardsInHalfSuit(declarationHalfSuit).every(card => {
+                          const cardKey = getCardKey(card);
+                          return declarationAssignments[cardKey] !== undefined;
+                        })}
+                        className="w-full mt-4"
+                        size="sm"
+                      >
+                        {isDeclaring ? 'Finishing...' : 'Finish Declaration'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {declareError && (
+                    <div className="text-xs text-destructive">{declareError}</div>
+                  )}
+                </CardContent>
+              </UICard>
+            ) : isMyTurn && !isInDeclarePhase ? (
+              <UICard className="w-80">
+                <CardHeader>
+                  <CardTitle className="text-sm">Your Turn</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedOpponent ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Suit</Label>
+                        <Select value={selectedSuit} onValueChange={(value) => setSelectedSuit(value as Card['suit'])}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allSuits.map(suit => (
+                              <SelectItem key={suit} value={suit} className="text-xs">{suit}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Rank</Label>
+                        <Select value={selectedRank} onValueChange={(value) => setSelectedRank(value as Card['rank'])}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allRanks.map(rank => (
+                              <SelectItem key={rank} value={rank} className="text-xs">{rank}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleAskForCard}
+                          disabled={!canAskForCard() || isAsking}
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {isAsking ? 'Asking...' : 'Ask'}
+                        </Button>
+                        <Button
+                          onClick={() => setSelectedOpponent('')}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {errorMessage && (
+                        <div className="text-xs text-destructive">{errorMessage}</div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xs text-muted-foreground text-center">
+                        Click an opponent to ask for a card
+                      </div>
+                      {isPlayerAlive(game, user.uid) && (
+                        <Button onClick={handleDeclare} disabled={isDeclaring} size="sm" className="w-full">
+                          {isDeclaring ? 'Starting...' : 'Declare'}
+                        </Button>
+                      )}
+                      {declareError && (
+                        <div className="text-xs text-destructive">{declareError}</div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </UICard>
+            ) : (
+              <UICard className="w-64">
+                <CardContent className="pt-6">
+                  <div className="text-center text-sm">
+                    {isInDeclarePhase 
+                      ? `${usernames.get(game.declarePhase?.declareeId || '') || 'A player'} is declaring...`
+                      : `Waiting for ${usernames.get(game.currentTurn) || 'player'}...`}
+                  </div>
+                </CardContent>
+              </UICard>
+            )}
+          </div>
+        </>
+      )}
+
+      {isPlayer && playerHand.length > 0 && (
+        <div
+          className={cn(
+            "fixed bottom-0 left-1/2 -translate-x-1/2 z-30 flex items-end justify-center gap-1 px-4 pb-2",
+            isMyTurn && "ring-4 ring-green-500 rounded-t-lg ring-offset-2 ring-offset-background"
+          )}
+        >
+          {playerHand.map((card, index) => (
+            <div
+              key={index}
+              className="transition-transform duration-200 translate-y-1/2 hover:translate-y-0 cursor-pointer"
+            >
+              <CardImage card={card} width={60} height={84} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
 export default GamePage;
-
