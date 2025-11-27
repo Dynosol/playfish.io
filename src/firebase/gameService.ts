@@ -5,7 +5,8 @@ import {
   onSnapshot,
   serverTimestamp,
   getDoc,
-  updateDoc
+  updateDoc,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -234,7 +235,6 @@ export const getOpponents = (game: Game, playerId: string): string[] => {
   return opponents;
 };
 
-// Main function to ask for a card
 export const askForCard = async (
   gameDocId: string,
   askerId: string,
@@ -243,77 +243,44 @@ export const askForCard = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const gameRef = doc(db, 'games', gameDocId);
-    const gameSnap = await getDoc(gameRef);
 
-    if (!gameSnap.exists()) {
-      return { success: false, error: 'Game not found' };
-    }
+    return await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
 
-    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' };
 
-    if (game.declarePhase?.active) {
-      return { success: false, error: 'Game is paused during declaration phase' };
-    }
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
-    if (game.currentTurn !== askerId) {
-      return { success: false, error: 'It is not your turn' };
-    }
+      if (game.declarePhase?.active) return { success: false, error: 'Game is paused during declaration phase' };
+      if (game.currentTurn !== askerId) return { success: false, error: 'It is not your turn' };
 
-    // Validation 2: Is the target an opponent?
-    const opponents = getOpponents(game, askerId);
-    if (!opponents.includes(targetId)) {
-      return { success: false, error: 'You must ask a player on the opposing team' };
-    }
+      const opponents = getOpponents(game, askerId);
+      if (!opponents.includes(targetId)) return { success: false, error: 'You must ask a player on the opposing team' };
 
-    const askerHand = game.playerHands[askerId] || [];
-    const targetHand = game.playerHands[targetId] || [];
+      const askerHand = game.playerHands[askerId] || [];
+      const targetHand = game.playerHands[targetId] || [];
 
-    // Validation 3: Does the asker already have this card?
-    if (hasCard(askerHand, card)) {
-      return { success: false, error: 'You already have this card' };
-    }
+      if (hasCard(askerHand, card)) return { success: false, error: 'You already have this card' };
+      if (!belongsToHalfSuit(askerHand, card.halfSuit)) return { success: false, error: 'You do not belong to this half-suit' };
 
-    if (!belongsToHalfSuit(askerHand, card.halfSuit)) {
-      return { success: false, error: 'You do not belong to this half-suit' };
-    }
+      const targetHasCard = hasCard(targetHand, card);
+      const updatedPlayerHands = { ...game.playerHands };
 
-    // Check if target has the card
-    const targetHasCard = hasCard(targetHand, card);
+      if (targetHasCard) {
+        updatedPlayerHands[targetId] = targetHand.filter(c => !(c.suit === card.suit && c.rank === card.rank));
+        updatedPlayerHands[askerId] = [...askerHand, card];
+      }
 
-    // Update game state
-    const updatedPlayerHands = { ...game.playerHands };
-    let newCurrentTurn = game.currentTurn;
+      const newTurn: Turn = { askerId, targetId, card, success: targetHasCard, timestamp: new Date() };
 
-    if (targetHasCard) {
-      // Transfer card from target to asker
-      updatedPlayerHands[targetId] = targetHand.filter(
-        c => !(c.suit === card.suit && c.rank === card.rank)
-      );
-      updatedPlayerHands[askerId] = [...askerHand, card];
-      // Asker gets another turn
-      newCurrentTurn = askerId;
-    } else {
-      // Turn passes to the target
-      newCurrentTurn = targetId;
-    }
+      transaction.update(gameRef, {
+        playerHands: updatedPlayerHands,
+        currentTurn: targetHasCard ? askerId : targetId,
+        turns: [...game.turns, newTurn]
+      });
 
-    // Record the turn
-    const newTurn: Turn = {
-      askerId,
-      targetId,
-      card,
-      success: targetHasCard,
-      timestamp: new Date()
-    };
-
-    // Update Firestore
-    await updateDoc(gameRef, {
-      playerHands: updatedPlayerHands,
-      currentTurn: newCurrentTurn,
-      turns: [...game.turns, newTurn]
+      return { success: true };
     });
-
-    return { success: true };
   } catch (error) {
     console.error('Error in askForCard:', error);
     return { success: false, error: 'An error occurred' };
@@ -326,32 +293,21 @@ export const startDeclaration = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const gameRef = doc(db, 'games', gameDocId);
-    const gameSnap = await getDoc(gameRef);
 
-    if (!gameSnap.exists()) {
-      return { success: false, error: 'Game not found' };
-    }
+    return await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
 
-    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' };
 
-    if (game.declarePhase?.active) {
-      return { success: false, error: 'A declaration is already in progress' };
-    }
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
-    if (!isPlayerAlive(game, declareeId)) {
-      return { success: false, error: 'You must have cards to declare' };
-    }
+      if (game.declarePhase?.active) return { success: false, error: 'A declaration is already in progress' };
+      if (!isPlayerAlive(game, declareeId)) return { success: false, error: 'You must have cards to declare' };
 
-    const declarePhase: DeclarePhase = {
-      active: true,
-      declareeId
-    };
+      transaction.update(gameRef, { declarePhase: { active: true, declareeId } });
 
-    await updateDoc(gameRef, {
-      declarePhase
+      return { success: true };
     });
-
-    return { success: true };
   } catch (error) {
     console.error('Error in startDeclaration:', error);
     return { success: false, error: 'An error occurred' };
@@ -367,113 +323,77 @@ export const finishDeclaration = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const gameRef = doc(db, 'games', gameDocId);
-    const gameSnap = await getDoc(gameRef);
 
-    if (!gameSnap.exists()) {
-      return { success: false, error: 'Game not found' };
-    }
+    const result = await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
 
-    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' } as const;
 
-    if (!game.declarePhase?.active || game.declarePhase.declareeId !== declareeId) {
-      return { success: false, error: 'You are not the active declaree' };
-    }
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
-    if (game.completedHalfsuits.includes(halfSuit)) {
-      return { success: false, error: 'This halfsuit has already been completed' };
-    }
+      if (!game.declarePhase?.active || game.declarePhase.declareeId !== declareeId) {
+        return { success: false, error: 'You are not the active declaree' } as const;
+      }
 
-    const allCardsInHalfSuit = getAllCardsInHalfSuit(halfSuit);
-    const allCardsAssigned = allCardsInHalfSuit.every(card => {
-      const cardKey = getCardKey(card);
-      return assignments[cardKey] !== undefined;
+      if (game.completedHalfsuits.includes(halfSuit)) {
+        return { success: false, error: 'This halfsuit has already been completed' } as const;
+      }
+
+      const allCardsInHalfSuit = getAllCardsInHalfSuit(halfSuit);
+      const allCardsAssigned = allCardsInHalfSuit.every(c => assignments[getCardKey(c)] !== undefined);
+
+      if (!allCardsAssigned) return { success: false, error: 'You must assign all cards in the halfsuit' } as const;
+
+      const teamPlayers = getTeamPlayers(game, team);
+      for (const card of allCardsInHalfSuit) {
+        if (!teamPlayers.includes(assignments[getCardKey(card)])) {
+          return { success: false, error: 'All cards must be assigned to players on the selected team' } as const;
+        }
+      }
+
+      const updatedPlayerHands = { ...game.playerHands };
+      let allCorrect = true;
+
+      for (const card of allCardsInHalfSuit) {
+        const assignedHand = updatedPlayerHands[assignments[getCardKey(card)]] || [];
+        if (!hasCard(assignedHand, card)) allCorrect = false;
+      }
+
+      for (const playerId of game.players) {
+        updatedPlayerHands[playerId] = (updatedPlayerHands[playerId] || []).filter(c => c.halfSuit !== halfSuit);
+      }
+
+      const declareeTeam = game.teams[declareeId];
+      const oppositeTeam = declareeTeam === 0 ? 1 : 0;
+      const updatedScores = { ...game.scores };
+      updatedScores[allCorrect ? declareeTeam : oppositeTeam]++;
+
+      let gameOver = game.gameOver;
+      const wasGameOver = gameOver !== null;
+      if (updatedScores[0] >= 5) gameOver = { winner: 0 };
+      else if (updatedScores[1] >= 5) gameOver = { winner: 1 };
+
+      transaction.update(gameRef, {
+        playerHands: updatedPlayerHands,
+        scores: updatedScores,
+        completedHalfsuits: [...game.completedHalfsuits, halfSuit],
+        declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, timestamp: new Date() }],
+        declarePhase: null,
+        gameOver
+      });
+
+      return { success: true, gameOver, wasGameOver, updatedScores, gameId: game.gameId } as const;
     });
 
-    if (!allCardsAssigned) {
-      return { success: false, error: 'You must assign all cards in the halfsuit' };
-    }
+    if (!result.success) return result;
 
-    const teamPlayers = getTeamPlayers(game, team);
-    for (const card of allCardsInHalfSuit) {
-      const cardKey = getCardKey(card);
-      const assignedPlayerId = assignments[cardKey];
-      if (!teamPlayers.includes(assignedPlayerId)) {
-        return { success: false, error: 'All cards must be assigned to players on the selected team' };
-      }
-    }
-
-    let allCorrect = true;
-    const updatedPlayerHands = { ...game.playerHands };
-
-    for (const card of allCardsInHalfSuit) {
-      const cardKey = getCardKey(card);
-      const assignedPlayerId = assignments[cardKey];
-      const assignedPlayerHand = updatedPlayerHands[assignedPlayerId] || [];
-      
-      const hasTheCard = hasCard(assignedPlayerHand, card);
-      if (!hasTheCard) {
-        allCorrect = false;
-      }
-    }
-
-    for (const playerId of game.players) {
-      const playerHand = updatedPlayerHands[playerId] || [];
-      updatedPlayerHands[playerId] = playerHand.filter(
-        card => card.halfSuit !== halfSuit
-      );
-    }
-
-    const declareeTeam = game.teams[declareeId];
-    const oppositeTeam = declareeTeam === 0 ? 1 : 0;
-
-    const currentScores = game.scores || { 0: 0, 1: 0 };
-    const updatedScores = { ...currentScores };
-    if (allCorrect) {
-      updatedScores[declareeTeam] = (updatedScores[declareeTeam] || 0) + 1;
-    } else {
-      updatedScores[oppositeTeam] = (updatedScores[oppositeTeam] || 0) + 1;
-    }
-
-    const updatedCompletedHalfsuits = [...game.completedHalfsuits, halfSuit];
-
-    const declaration: Declaration = {
-      declareeId,
-      halfSuit,
-      team,
-      assignments,
-      correct: allCorrect,
-      timestamp: new Date()
-    };
-
-    let gameOver = game.gameOver;
-    const wasGameOver = gameOver !== null;
-    if (updatedScores[0] >= 5) {
-      gameOver = { winner: 0 };
-    } else if (updatedScores[1] >= 5) {
-      gameOver = { winner: 1 };
-    }
-
-    await updateDoc(gameRef, {
-      playerHands: updatedPlayerHands,
-      scores: updatedScores,
-      completedHalfsuits: updatedCompletedHalfsuits,
-      declarations: [...game.declarations, declaration],
-      declarePhase: null,
-      gameOver
-    });
-
-    if (gameOver && !wasGameOver) {
-      const lobbyRef = doc(db, 'lobbies', game.gameId);
+    if (result.gameOver && !result.wasGameOver) {
+      const lobbyRef = doc(db, 'lobbies', result.gameId);
       const lobbySnap = await getDoc(lobbyRef);
       if (lobbySnap.exists()) {
-        const lobbyData = lobbySnap.data();
-        const currentHistoricalScores = lobbyData?.historicalScores || { 0: 0, 1: 0 };
-        const updatedHistoricalScores = {
-          0: currentHistoricalScores[0] + updatedScores[0],
-          1: currentHistoricalScores[1] + updatedScores[1]
-        };
+        const current = lobbySnap.data()?.historicalScores || { 0: 0, 1: 0 };
         await updateDoc(lobbyRef, {
-          historicalScores: updatedHistoricalScores
+          historicalScores: { 0: current[0] + result.updatedScores[0], 1: current[1] + result.updatedScores[1] }
         });
       }
     }
@@ -491,52 +411,50 @@ export const voteForReplay = async (
 ): Promise<{ success: boolean; error?: string; shouldReplay?: boolean }> => {
   try {
     const gameRef = doc(db, 'games', gameDocId);
-    const gameSnap = await getDoc(gameRef);
 
-    if (!gameSnap.exists()) {
-      return { success: false, error: 'Game not found' };
-    }
+    const result = await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
 
-    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' } as const;
 
-    if (!game.gameOver) {
-      return { success: false, error: 'Game is not over' };
-    }
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
-    if (game.replayVotes.includes(playerId)) {
-      return { success: false, error: 'You have already voted for replay' };
-    }
+      if (!game.gameOver) return { success: false, error: 'Game is not over' } as const;
+      if (game.replayVotes.includes(playerId)) return { success: false, error: 'You have already voted for replay' } as const;
 
-    const lobbyRef = doc(db, 'lobbies', game.gameId);
-    const lobbySnap = await getDoc(lobbyRef);
-    
-    if (!lobbySnap.exists()) {
-      return { success: false, error: 'Lobby not found' };
-    }
+      const lobbyRef = doc(db, 'lobbies', game.gameId);
+      const lobbySnap = await transaction.get(lobbyRef);
 
-    const lobbyData = lobbySnap.data() as { createdBy: string; historicalScores?: { 0: number; 1: number } };
-    const hostId = lobbyData.createdBy;
-    const nonHostPlayers = game.players.filter(p => p !== hostId);
-    const updatedReplayVotes = [...game.replayVotes, playerId];
-    const allNonHostVoted = nonHostPlayers.every(p => updatedReplayVotes.includes(p));
+      if (!lobbySnap.exists()) return { success: false, error: 'Lobby not found' } as const;
 
-    await updateDoc(gameRef, {
-      replayVotes: updatedReplayVotes
+      const lobbyData = lobbySnap.data() as { createdBy: string; historicalScores?: { 0: number; 1: number } };
+      const nonHostPlayers = game.players.filter(p => p !== lobbyData.createdBy);
+      const updatedReplayVotes = [...game.replayVotes, playerId];
+      const allNonHostVoted = nonHostPlayers.every(p => updatedReplayVotes.includes(p));
+
+      transaction.update(gameRef, { replayVotes: updatedReplayVotes });
+
+      return { 
+        success: true, 
+        allNonHostVoted, 
+        game, 
+        lobbyRef, 
+        historicalScores: lobbyData.historicalScores || { 0: 0, 1: 0 } 
+      } as const;
     });
 
-    if (allNonHostVoted) {
-      const historicalScores = lobbyData.historicalScores || { 0: 0, 1: 0 };
-      const teamAssignments: { [playerId: string]: 0 | 1 } = {};
-      for (const pid of game.players) {
-        teamAssignments[pid] = game.teams[pid];
-      }
+    if (!result.success) return result;
 
-      const newGameDocId = await createGame(game.gameId, game.players, teamAssignments);
+    if (result.allNonHostVoted) {
+      const teamAssignments: { [pid: string]: 0 | 1 } = {};
+      result.game.players.forEach(pid => { teamAssignments[pid] = result.game.teams[pid]; });
 
-      await updateDoc(lobbyRef, {
+      const newGameDocId = await createGame(result.game.gameId, result.game.players, teamAssignments);
+
+      await updateDoc(result.lobbyRef, {
         status: 'playing',
         onGoingGame: newGameDocId,
-        historicalScores
+        historicalScores: result.historicalScores
       });
 
       return { success: true, shouldReplay: true };

@@ -12,12 +12,10 @@ import { db } from './config';
 
 export interface ChatMessage {
   id: string;
-  gameId: string;
   userId: string;
   userName: string;
   message: string;
   timestamp: Date;
-  createdAt: Date;
 }
 
 export const sendMessage = async (
@@ -28,12 +26,10 @@ export const sendMessage = async (
 ): Promise<void> => {
   const messagesRef = collection(db, 'games', gameId, 'messages');
   await addDoc(messagesRef, {
-    gameId,
     userId,
     userName,
     message: message.trim(),
-    timestamp: serverTimestamp(),
-    createdAt: serverTimestamp()
+    timestamp: serverTimestamp()
   });
 };
 
@@ -52,33 +48,16 @@ export const subscribeToMessages = (
   return onSnapshot(messagesQuery, (snapshot) => {
     const messages = snapshot.docs.map(doc => {
       const data = doc.data();
-      let timestamp: Date;
-      let createdAt: Date;
-
-      if (data.timestamp instanceof Timestamp) {
-        timestamp = data.timestamp.toDate();
-      } else if (data.timestamp?.toDate) {
-        timestamp = data.timestamp.toDate();
-      } else {
-        timestamp = new Date();
-      }
-
-      if (data.createdAt instanceof Timestamp) {
-        createdAt = data.createdAt.toDate();
-      } else if (data.createdAt?.toDate) {
-        createdAt = data.createdAt.toDate();
-      } else {
-        createdAt = new Date();
-      }
+      const timestamp = data.timestamp instanceof Timestamp 
+        ? data.timestamp.toDate() 
+        : data.timestamp?.toDate?.() ?? new Date();
 
       return {
         id: doc.id,
-        gameId: data.gameId,
         userId: data.userId,
-        userName: data.userName || `User ${data.userId.slice(0, 16)}`,
+        userName: data.userName || `User ${data.userId?.slice(0, 16) ?? 'Unknown'}`,
         message: data.message,
-        timestamp,
-        createdAt
+        timestamp
       } as ChatMessage;
     });
 

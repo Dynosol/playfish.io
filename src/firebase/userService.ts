@@ -8,7 +8,8 @@ import {
   query,
   where,
   Timestamp,
-  getDocs
+  getDocs,
+  documentId
 } from 'firebase/firestore';
 import { db } from './config';
 import { generateUsername } from '../utils/usernameGenerator';
@@ -32,10 +33,9 @@ export const createOrUpdateUser = async (uid: string): Promise<void> => {
       lastOnline: serverTimestamp()
     }, { merge: true });
   } else {
-    const username = generateUsername();
     await setDoc(userRef, {
       uid,
-      username,
+      username: generateUsername(),
       currentLobbyId: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -70,6 +70,37 @@ export const subscribeToUser = (
   });
 };
 
+export const subscribeToUsers = (
+  uids: string[],
+  callback: (users: UserDocument[]) => void
+): (() => void) => {
+  if (uids.length === 0) {
+    callback([]);
+    return () => {};
+  }
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < uids.length; i += 30) {
+    chunks.push(uids.slice(i, i + 30));
+  }
+
+  const results = new Map<string, UserDocument>();
+  const unsubscribes: (() => void)[] = [];
+
+  chunks.forEach((chunk) => {
+    const q = query(collection(db, 'users'), where(documentId(), 'in', chunk));
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docs.forEach(d => {
+        results.set(d.id, { uid: d.id, ...d.data() } as UserDocument);
+      });
+      callback(Array.from(results.values()));
+    });
+    unsubscribes.push(unsub);
+  });
+
+  return () => unsubscribes.forEach(u => u());
+};
+
 export const getUser = async (uid: string): Promise<UserDocument | null> => {
   const userSnap = await getDoc(doc(db, 'users', uid));
   if (userSnap.exists()) {
@@ -85,12 +116,7 @@ export const updateUserLastOnline = async (uid: string): Promise<void> => {
   }, { merge: true });
 };
 
-export const updateUserLogoffTime = async (uid: string): Promise<void> => {
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, {
-    lastOnline: serverTimestamp()
-  }, { merge: true });
-};
+export const updateUserLogoffTime = updateUserLastOnline;
 
 export const updateUsername = async (uid: string, username: string): Promise<void> => {
   if (!username || username.trim().length === 0) {
