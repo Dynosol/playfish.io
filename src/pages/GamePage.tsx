@@ -307,23 +307,53 @@ const GamePage: React.FC = () => {
   return (
     <div className="h-screen w-screen overflow-hidden bg-background relative">
       <header className="absolute top-0 left-0 right-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-sm">
-            <Gamepad2 className="h-4 w-4" />
-            <span>{lobby.name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span>Team 1: <strong>{game.scores?.[0] || 0}</strong></span>
-            <span>|</span>
-            <span>Team 2: <strong>{game.scores?.[1] || 0}</strong></span>
-          </div>
+        <div className="px-4 h-12 flex items-center justify-between relative">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
+          
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 font-bold text-sm">
+            <Gamepad2 className="h-4 w-4" />
+            <span>{lobby.name}</span>
+          </div>
+
+          <div className="w-8" /> {/* Spacer for balance */}
         </div>
       </header>
 
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-14 left-4 z-30 text-lg font-semibold bg-background/80 p-2 rounded-lg border shadow-sm">
+        <div className="flex items-center gap-4">
+          <span>Red Team: <strong>{game.scores?.[0] || 0}</strong></span>
+          <span className="text-muted-foreground">|</span>
+          <span>Blue Team: <strong>{game.scores?.[1] || 0}</strong></span>
+        </div>
+      </div>
+
+      {isInDeclarePhase && (
+        <div className="absolute top-12 left-0 right-0 z-30 border-b bg-muted/50 px-4 py-2">
+          <div className="text-sm text-center">
+            {isDeclaree ? (
+              <>
+                {!declarationHalfSuit && (
+                  <span className="font-medium">You have started declaring...</span>
+                )}
+                {declarationHalfSuit && declarationTeam === null && (
+                  <span className="font-medium">Selecting team for {declarationHalfSuit}...</span>
+                )}
+                {declarationHalfSuit && declarationTeam !== null && (
+                  <span className="font-medium">Assigning cards for {declarationHalfSuit} to {declarationTeam === 0 ? 'Red Team' : 'Blue Team'}...</span>
+                )}
+              </>
+            ) : (
+              <span className="font-medium">
+                {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} has started declaring...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="absolute bottom-4 left-4 z-50">
         <ChatBox gameId={game.id} />
       </div>
 
@@ -332,7 +362,7 @@ const GamePage: React.FC = () => {
           <UICard className="w-96">
             <CardHeader>
               <CardTitle className="text-2xl text-center">
-                TEAM {winningTeam === 0 ? '1' : '2'} WINS!
+                {winningTeam === 0 ? 'RED TEAM' : 'BLUE TEAM'} WINS!
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -382,17 +412,25 @@ const GamePage: React.FC = () => {
               >
                 <div
                   className={cn(
-                    "w-16 h-16 rounded-full bg-muted border-4 flex items-center justify-center transition-all",
+                    "w-24 h-24 rounded-full bg-muted border-4 flex items-center justify-center transition-all",
                     isCurrentTurn ? "border-green-500 shadow-lg shadow-green-500/50" : "border-border",
                     isClickable ? "cursor-pointer hover:bg-muted/80" : "cursor-not-allowed opacity-60"
                   )}
                   onClick={() => isClickable && setSelectedOpponent(playerId)}
                 >
-                  <User className="h-8 w-8 text-muted-foreground" />
+                  <User className="h-12 w-12 text-muted-foreground" />
                 </div>
-                <div className="mt-2 text-center">
-                  <div className="text-xs font-medium">{playerUsername}</div>
-                  <Badge variant="secondary" className="text-[10px] mt-1">{handSize} cards</Badge>
+                <div className="mt-2 text-center space-y-1">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="text-sm font-bold">{playerUsername}</div>
+                    <Badge variant="outline" className={cn(
+                      "text-xs px-1 py-0 h-5",
+                      game.teams[playerId] === 0 ? "text-red-500 border-red-200" : "text-blue-500 border-blue-200"
+                    )}>
+                      {game.teams[playerId] === 0 ? 'Red' : 'Blue'}
+                    </Badge>
+                  </div>
+                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">{handSize} cards</Badge>
                 </div>
               </div>
             );
@@ -400,7 +438,7 @@ const GamePage: React.FC = () => {
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
             {isInDeclarePhase && isDeclaree ? (
-              <UICard className="w-96 max-h-[80vh] overflow-y-auto">
+              <UICard className="w-96 max-h-[60vh] overflow-y-auto">
                 <CardHeader>
                   <CardTitle className="text-sm">Declaration Phase</CardTitle>
                 </CardHeader>
@@ -430,11 +468,11 @@ const GamePage: React.FC = () => {
                         Halfsuit: {declarationHalfSuit}
                       </div>
                       <div className="flex gap-2">
-                        <Button onClick={() => handleSelectTeam(0)} variant="outline" size="sm">
-                          Team 1
+                        <Button onClick={() => handleSelectTeam(0)} variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">
+                          Red Team
                         </Button>
-                        <Button onClick={() => handleSelectTeam(1)} variant="outline" size="sm">
-                          Team 2
+                        <Button onClick={() => handleSelectTeam(1)} variant="outline" size="sm" className="text-blue-500 border-blue-200 hover:bg-blue-50 hover:text-blue-600">
+                          Blue Team
                         </Button>
                       </div>
                     </div>
@@ -493,89 +531,104 @@ const GamePage: React.FC = () => {
                   )}
                 </CardContent>
               </UICard>
-            ) : isMyTurn && !isInDeclarePhase ? (
+            ) : isMyTurn && !isInDeclarePhase && selectedOpponent ? (
               <UICard className="w-80">
                 <CardHeader>
                   <CardTitle className="text-sm">Your Turn</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {selectedOpponent ? (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Suit</Label>
-                        <Select value={selectedSuit} onValueChange={(value) => setSelectedSuit(value as Card['suit'])}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allSuits.map(suit => (
-                              <SelectItem key={suit} value={suit} className="text-xs">{suit}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Rank</Label>
-                        <Select value={selectedRank} onValueChange={(value) => setSelectedRank(value as Card['rank'])}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allRanks.map(rank => (
-                              <SelectItem key={rank} value={rank} className="text-xs">{rank}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleAskForCard}
-                          disabled={!canAskForCard() || isAsking}
-                          size="sm"
-                          className="flex-1"
-                        >
-                          {isAsking ? 'Asking...' : 'Ask'}
-                        </Button>
-                        <Button
-                          onClick={() => setSelectedOpponent('')}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                      {errorMessage && (
-                        <div className="text-xs text-destructive">{errorMessage}</div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-xs text-muted-foreground text-center">
-                        Click an opponent to ask for a card
-                      </div>
-                      {isPlayerAlive(game, user.uid) && (
-                        <Button onClick={handleDeclare} disabled={isDeclaring} size="sm" className="w-full">
-                          {isDeclaring ? 'Starting...' : 'Declare'}
-                        </Button>
-                      )}
-                      {declareError && (
-                        <div className="text-xs text-destructive">{declareError}</div>
-                      )}
-                    </>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Suit</Label>
+                    <Select value={selectedSuit} onValueChange={(value) => setSelectedSuit(value as Card['suit'])}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allSuits.map(suit => (
+                          <SelectItem key={suit} value={suit} className="text-xs">{suit}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Rank</Label>
+                    <Select value={selectedRank} onValueChange={(value) => setSelectedRank(value as Card['rank'])}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allRanks.map(rank => (
+                          <SelectItem key={rank} value={rank} className="text-xs">{rank}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleAskForCard}
+                      disabled={!canAskForCard() || isAsking}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      {isAsking ? 'Asking...' : 'Ask'}
+                    </Button>
+                    <Button
+                      onClick={() => setSelectedOpponent('')}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  {errorMessage && (
+                    <div className="text-xs text-destructive">{errorMessage}</div>
                   )}
+                </CardContent>
+              </UICard>
+            ) : !isInDeclarePhase ? (
+              <UICard className="w-64">
+                <CardContent className="pt-6">
+                  <div className="text-center text-sm">
+                    {`Waiting for ${usernames.get(game.currentTurn) || 'player'}...`}
+                  </div>
                 </CardContent>
               </UICard>
             ) : (
               <UICard className="w-64">
                 <CardContent className="pt-6">
                   <div className="text-center text-sm">
-                    {isInDeclarePhase 
-                      ? `${usernames.get(game.declarePhase?.declareeId || '') || 'A player'} is declaring...`
-                      : `Waiting for ${usernames.get(game.currentTurn) || 'player'}...`}
+                    {`Waiting for ${usernames.get(game.declarePhase?.declareeId || '') || 'player'} to finish declaring...`}
                   </div>
                 </CardContent>
               </UICard>
             )}
+          </div>
+
+          <div className="absolute left-1/2 bottom-[180px] -translate-x-1/2 z-20">
+            <fieldset className="border-2 border-border rounded-lg p-4 bg-background w-[500px]">
+              <legend className="px-2 text-xs font-semibold">Available actions:</legend>
+              <div className="flex gap-4">
+                <Button
+                  disabled={!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer}
+                  className={cn(
+                    "flex-1 h-12 text-lg",
+                    (!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer) && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  Ask
+                </Button>
+                <Button
+                  onClick={handleDeclare}
+                  disabled={isDeclaring || isInDeclarePhase || !isPlayer || !isPlayerAlive(game, user?.uid || '')}
+                  className="flex-1 h-12 text-lg"
+                >
+                  {isDeclaring ? 'Starting...' : 'Declare'}
+                </Button>
+              </div>
+              {declareError && (
+                <div className="text-xs text-destructive mt-2 text-center">{declareError}</div>
+              )}
+            </fieldset>
           </div>
         </>
       )}
@@ -636,13 +689,13 @@ const GamePage: React.FC = () => {
                 style={{
                   left: '50%',
                   bottom: '-30px', // Translate cards downward
-                  marginLeft: `calc(-45px - ${xOffset}px)`, // Adjust left margin to center the fan
+                  marginLeft: `calc(-60px - ${xOffset}px)`, // Adjust left margin to center the fan
                   transformOrigin: `50% ${radius}px`,
                   transform: `rotate(${rotation}deg) translateY(-${translateY}px)`,
                   zIndex: index,
                 }}
               >
-                <CardImage card={card} width={90} height={126} />
+                <CardImage card={card} width={120} height={168} />
               </div>
             );
           })}

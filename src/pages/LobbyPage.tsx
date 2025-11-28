@@ -158,7 +158,7 @@ const LobbyPage: React.FC = () => {
       {lobby.status === 'waiting' && (
         <div>
           <div>
-            <h3>Team 1 ({team0Players.length})</h3>
+            <h3>Red Team ({team0Players.length})</h3>
             <ul>
               {team0Players.map(playerId => {
                 const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
@@ -177,13 +177,13 @@ const LobbyPage: React.FC = () => {
             </ul>
             {user && userTeam !== 0 && (
               <button onClick={() => handleJoinTeam(0)}>
-                Join Team 1
+                Join Red Team
               </button>
             )}
           </div>
 
           <div>
-            <h3>Team 2 ({team1Players.length})</h3>
+            <h3>Blue Team ({team1Players.length})</h3>
             <ul>
               {team1Players.map(playerId => {
                 const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
@@ -202,7 +202,7 @@ const LobbyPage: React.FC = () => {
             </ul>
             {user && userTeam !== 1 && (
               <button onClick={() => handleJoinTeam(1)}>
-                Join Team 2
+                Join Blue Team
               </button>
             )}
           </div>

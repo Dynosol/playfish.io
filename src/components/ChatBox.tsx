@@ -5,7 +5,7 @@ import { useUsername } from '../hooks/useUsername';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Send, Minimize2 } from 'lucide-react';
+import { MessageSquare, Send } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface ChatBoxProps {
@@ -17,7 +17,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const username = useUsername(user?.uid);
@@ -35,10 +34,32 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
   }, [gameId]);
 
   useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const formatTimestamp = (timestamp: Date): string => {
+    const now = new Date();
+    const messageDate = new Date(timestamp);
+    const diffInHours = (now.getTime() - messageDate.getTime()) / (1000 * 60 * 60);
+
+    const locale = navigator.language || 'en-US';
+    const timeOptions: Intl.DateTimeFormatOptions = {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+
+    if (diffInHours < 24) {
+      return messageDate.toLocaleTimeString(locale, timeOptions);
+    } else {
+      return messageDate.toLocaleString(locale, {
+        month: 'short',
+        day: 'numeric',
+        ...timeOptions
+      });
     }
-  }, [messages, isOpen]);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,19 +77,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
     }
   };
 
-  if (!isOpen) {
-    return (
-      <Button 
-        variant="outline" 
-        size="icon" 
-        className={cn("h-12 w-12 rounded-full shadow-lg bg-background", className)}
-        onClick={() => setIsOpen(true)}
-      >
-        <MessageSquare className="h-6 w-6" />
-      </Button>
-    );
-  }
-
   return (
     <Card className={cn("w-80 shadow-xl flex flex-col h-[400px]", className)}>
       <CardHeader className="p-3 border-b flex flex-row items-center justify-between space-y-0 bg-muted/50">
@@ -76,9 +84,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
           <MessageSquare className="h-4 w-4" />
           Chat
         </CardTitle>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsOpen(false)}>
-          <Minimize2 className="h-4 w-4" />
-        </Button>
       </CardHeader>
       <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto p-3">
@@ -100,6 +105,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
                   >
                     <span className="text-[10px] text-muted-foreground mb-0.5">
                       {isCurrentUser ? 'You' : msg.userName}
+                      <span className="ml-1.5 opacity-70">{formatTimestamp(msg.timestamp)}</span>
                     </span>
                     <div 
                       className={cn(
