@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Gamepad2, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser } from '../firebase/userService';
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import Header from '@/components/Header';
 
 const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -108,24 +109,7 @@ const StartPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-xl">
-            <Gamepad2 className="h-6 w-6" />
-            <span>playfish.io</span>
-          </div>
-          
-          <div className="text-lg font-medium">
-            Welcome, {userDoc?.username ?? 'Player'}
-          </div>
-          
-          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
-            <Settings className="h-5 w-5" />
-            <span className="sr-only">Settings</span>
-          </Button>
-        </div>
-      </header>
+      <Header type="home" />
 
       <main className="flex-1 container mx-auto px-4 py-8">
         {/* Current Game Banner */}
@@ -133,7 +117,6 @@ const StartPage: React.FC = () => {
           <Card className="mb-8 bg-primary/5 border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Gamepad2 className="h-5 w-5 text-primary" />
                 Active Session
               </CardTitle>
             </CardHeader>

@@ -5,7 +5,8 @@ import { useUsername } from '../hooks/useUsername';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Send } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, Send, Minus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface ChatBoxProps {
@@ -17,7 +18,10 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastReadCountRef = useRef(0);
   const { user } = useAuth();
   const username = useUsername(user?.uid);
 
@@ -36,6 +40,16 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    if (!isMinimized) {
+      lastReadCountRef.current = messages.length;
+      setUnreadCount(0);
+    } else {
+      const count = messages.length - lastReadCountRef.current;
+      if (count > 0) setUnreadCount(count);
+    }
+  }, [messages, isMinimized]);
 
   const formatTimestamp = (timestamp: Date): string => {
     const now = new Date();
@@ -77,13 +91,40 @@ const ChatBox: React.FC<ChatBoxProps> = ({ gameId, className }) => {
     }
   };
 
+  const handleMinimize = () => {
+    setIsMinimized(true);
+    lastReadCountRef.current = messages.length;
+    setUnreadCount(0);
+  };
+
+  if (isMinimized) {
+    return (
+      <div className={cn("relative", className)}>
+        <Button
+          onClick={() => setIsMinimized(false)}
+          className="rounded-full h-12 w-12"
+        >
+          <MessageSquare className="h-6 w-6" />
+        </Button>
+        {unreadCount > 0 && (
+          <Badge className="absolute -top-1 -right-1 px-1.5 min-w-[1.25rem] h-5 flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full text-[10px] border-2 border-background pointer-events-none">
+            {unreadCount}
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <Card className={cn("w-80 shadow-xl flex flex-col h-[400px]", className)}>
+    <Card className={cn("w-80 flex flex-col h-[400px]", className)}>
       <CardHeader className="p-3 border-b flex flex-row items-center justify-between space-y-0 bg-muted/50">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
           Chat
         </CardTitle>
+        <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2" onClick={handleMinimize}>
+          <Minus className="h-4 w-4" />
+        </Button>
       </CardHeader>
       <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto p-3">

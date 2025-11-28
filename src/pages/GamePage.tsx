@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Gamepad2, User, ArrowLeft } from 'lucide-react';
+import { User, ArrowLeft, Shuffle, ArrowDownUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import Header from '@/components/Header';
 import {
   subscribeToGame,
   getPlayerHand,
@@ -21,6 +22,7 @@ import {
 import { subscribeToLobby, returnToLobby, replayGame } from '../firebase/lobbyService';
 import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
+import cardBack from '../assets/cards/card_back.svg';
 import ChatBox from '../components/ChatBox';
 import { useUsernames } from '../hooks/useUsername';
 import CardImage from '../components/CardImage';
@@ -49,6 +51,18 @@ const GamePage: React.FC = () => {
   const [declarationHalfSuit, setDeclarationHalfSuit] = useState<Card['halfSuit'] | null>(null);
   const [declarationTeam, setDeclarationTeam] = useState<0 | 1 | null>(null);
   const [declarationAssignments, setDeclarationAssignments] = useState<{ [cardKey: string]: string }>({});
+  const [localPlayerHand, setLocalPlayerHand] = useState<Card[]>([]);
+  const [sortMethod, setSortMethod] = useState<'rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc'>('suit_rank_asc');
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  useEffect(() => {
+    if (toast.visible) {
+      const timer = setTimeout(() => {
+        setToast(prev => ({ ...prev, visible: false }));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.visible]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -94,6 +108,30 @@ const GamePage: React.FC = () => {
   const playersArray = useMemo(() => game?.players || [], [game?.players]);
   const usernames = useUsernames(playersArray);
 
+  const isPlayer = (!!user && game?.players?.includes(user.uid)) || false;
+  const isMyTurn = (!!user && isPlayer && game && game.currentTurn === user.uid) || false;
+  
+  const serverPlayerHand = useMemo(() => {
+    if (!isPlayer || !game || !user) return [];
+    return getPlayerHand(game, user.uid);
+  }, [game, isPlayer, user]);
+  
+  useEffect(() => {
+    if (isPlayer && game && user) {
+      setLocalPlayerHand(prev => {
+        const prevKeys = prev.map(getCardKey).sort().join(',');
+        const newKeys = serverPlayerHand.map(getCardKey).sort().join(',');
+        
+        if (prevKeys !== newKeys) {
+           return sortCards(serverPlayerHand, sortMethod);
+        }
+        return prev;
+      });
+    } else {
+      setLocalPlayerHand([]);
+    }
+  }, [game, isPlayer, user, sortMethod, serverPlayerHand]);
+
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading game...</div>;
   }
@@ -134,20 +172,66 @@ const GamePage: React.FC = () => {
     );
   }
 
-  const isPlayer = user && game.players.includes(user.uid);
-  const playerHand = isPlayer ? getPlayerHand(game, user.uid) : [];
-  const isMyTurn = isPlayer && game.currentTurn === user.uid;
+  const playerHand = localPlayerHand;
 
-  const opponents = isPlayer && user ? getOpponents(game, user.uid) : [];
-  const allOtherPlayers = isPlayer && user 
+  const opponents = (isPlayer && user && game) ? getOpponents(game, user.uid) : [];
+  const allOtherPlayers = (isPlayer && user && game)
     ? game.players.filter(playerId => playerId !== user.uid)
     : [];
 
   const allSuits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
   const allRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
 
+  const sortCards = (cards: Card[], method: 'rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc') => {
+    const rankValues: Record<string, number> = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
+    const suitValues: Record<string, number> = { 'clubs': 0, 'diamonds': 1, 'hearts': 2, 'spades': 3 };
+
+    return [...cards].sort((a, b) => {
+      if (method === 'rank_asc') {
+        return rankValues[a.rank] - rankValues[b.rank] || suitValues[a.suit] - suitValues[b.suit];
+      } else if (method === 'rank_desc') {
+        return rankValues[b.rank] - rankValues[a.rank] || suitValues[b.suit] - suitValues[a.suit];
+      } else if (method === 'suit_rank_asc') {
+        return suitValues[a.suit] - suitValues[b.suit] || rankValues[a.rank] - rankValues[b.rank];
+      } else { // suit_rank_desc
+        return suitValues[b.suit] - suitValues[a.suit] || rankValues[b.rank] - rankValues[a.rank];
+      }
+    });
+  };
+
+  const handleShuffle = () => {
+    setLocalPlayerHand(prev => {
+      const shuffled = [...prev];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    });
+    setToast({ message: 'Shuffled!', visible: true });
+  };
+
+  const handleSort = () => {
+    setSortMethod(prev => {
+      const methods: ('rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc')[] = ['suit_rank_asc', 'suit_rank_desc', 'rank_asc', 'rank_desc'];
+      const currentIndex = methods.indexOf(prev);
+      const nextMethod = methods[(currentIndex + 1) % methods.length];
+      setLocalPlayerHand(currentHand => sortCards(currentHand, nextMethod));
+      
+      const labels: Record<string, string> = {
+        'rank_asc': 'ascending rank',
+        'rank_desc': 'descending rank',
+        'suit_rank_asc': 'ascending suit',
+        'suit_rank_desc': 'descending suit'
+      };
+      setToast({ message: `Ordered by ${labels[nextMethod]}!`, visible: true });
+
+      return nextMethod;
+    });
+  };
+
   const handleAskForCard = async () => {
-    if (!isPlayer || !game) return;
+    if (!user || !isPlayer || !game) return;
 
     setErrorMessage('');
     setIsAsking(true);
@@ -304,56 +388,119 @@ const GamePage: React.FC = () => {
     return { left: `${x}%`, top: `${y}%` };
   };
 
+  const OpponentHandVisual = ({ count }: { count: number }) => {
+    if (count === 0) return <div className="h-12" />; // Placeholder height
+
+    const topRow = Math.ceil(count / 2);
+    const bottomRow = Math.floor(count / 2);
+    const cardHeight = 32;
+    const cardWidth = 22;
+
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center -space-y-4 mt-1">
+          {/* Top Row */}
+          <div className="flex">
+            {Array.from({ length: topRow }).map((_, i) => (
+              <img
+                key={`top-${i}`}
+                src={cardBack}
+                alt="card back"
+                className="shadow-sm rounded-sm border-white border-[0.5px] bg-red-500 block"
+                style={{
+                  width: `${cardWidth}px`,
+                  height: `${cardHeight}px`,
+                  marginLeft: i === 0 ? 0 : '-14px',
+                  zIndex: i
+                }}
+              />
+            ))}
+          </div>
+          {/* Bottom Row */}
+          {bottomRow > 0 && (
+            <div className="flex">
+              {Array.from({ length: bottomRow }).map((_, i) => (
+                <img
+                  key={`bottom-${i}`}
+                  src={cardBack}
+                  alt="card back"
+                  className="shadow-sm rounded-sm border-white border-[0.5px] bg-red-500 block"
+                  style={{
+                    width: `${cardWidth}px`,
+                    height: `${cardHeight}px`,
+                    marginLeft: i === 0 ? 0 : '-14px',
+                    zIndex: 10 + i
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        <span className="text-xs font-bold text-muted-foreground">{count} left</span>
+      </div>
+    );
+  };
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-background relative">
-      <header className="absolute top-0 left-0 right-0 z-40 border-b bg-background/95 backdrop-blur">
-        <div className="px-4 h-12 flex items-center justify-between relative">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 font-bold text-sm">
-            <Gamepad2 className="h-4 w-4" />
-            <span>{lobby.name}</span>
+      <Header 
+        type="game" 
+        roomName={lobby.name} 
+        className="absolute top-0 left-0 right-0 bg-background/95 backdrop-blur" 
+      />
+
+      {/* Scores (Center Table) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col gap-4 items-center pointer-events-none">
+        <div className="text-2xl font-bold bg-background/50 p-4 rounded-xl border shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-center">
+              <span className="text-sm text-red-500 uppercase tracking-wider font-bold">Red Team</span>
+              <span className="text-4xl">{game.scores?.[0] || 0}</span>
+            </div>
+            <div className="h-12 w-px bg-border mx-2" />
+            <div className="flex flex-col items-center">
+              <span className="text-sm text-blue-500 uppercase tracking-wider font-bold">Blue Team</span>
+              <span className="text-4xl">{game.scores?.[1] || 0}</span>
+            </div>
           </div>
-
-          <div className="w-8" /> {/* Spacer for balance */}
-        </div>
-      </header>
-
-      <div className="absolute top-14 left-4 z-30 text-lg font-semibold bg-background/80 p-2 rounded-lg border shadow-sm">
-        <div className="flex items-center gap-4">
-          <span>Red Team: <strong>{game.scores?.[0] || 0}</strong></span>
-          <span className="text-muted-foreground">|</span>
-          <span>Blue Team: <strong>{game.scores?.[1] || 0}</strong></span>
         </div>
       </div>
 
-      {isInDeclarePhase && (
-        <div className="absolute top-12 left-0 right-0 z-30 border-b bg-muted/50 px-4 py-2">
-          <div className="text-sm text-center">
-            {isDeclaree ? (
-              <>
-                {!declarationHalfSuit && (
-                  <span className="font-medium">You have started declaring...</span>
+      {/* Status Announcement (Top Center - below header) */}
+      <div className="absolute top-[72px] left-0 right-0 z-30 px-4 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto max-w-md">
+          {!isInDeclarePhase ? (
+            <div className="bg-background/95 backdrop-blur shadow-md border rounded-lg px-4 py-2">
+              <div className="text-sm text-center">
+                {isMyTurn ? (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-base text-green-600">It is your turn!</span>
+                    <span className="text-xs text-muted-foreground">Press on the player you wish to ask.</span>
+                  </div>
+                ) : (
+                  <div className="font-medium">
+                    Waiting for {usernames.get(game.currentTurn) || 'player'}...
+                  </div>
                 )}
-                {declarationHalfSuit && declarationTeam === null && (
-                  <span className="font-medium">Selecting team for {declarationHalfSuit}...</span>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-background/95 backdrop-blur shadow-md border rounded-lg px-4 py-2">
+              <div className="text-sm text-center">
+                {isDeclaree ? (
+                  <span className="font-bold text-amber-600">You are declaring!</span>
+                ) : (
+                  <span className="font-medium">
+                    {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} has started declaring...
+                  </span>
                 )}
-                {declarationHalfSuit && declarationTeam !== null && (
-                  <span className="font-medium">Assigning cards for {declarationHalfSuit} to {declarationTeam === 0 ? 'Red Team' : 'Blue Team'}...</span>
-                )}
-              </>
-            ) : (
-              <span className="font-medium">
-                {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} has started declaring...
-              </span>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="absolute bottom-4 left-4 z-50">
+      <div className="absolute bottom-4 right-4 z-50">
         <ChatBox gameId={game.id} />
       </div>
 
@@ -413,7 +560,7 @@ const GamePage: React.FC = () => {
                 <div
                   className={cn(
                     "w-24 h-24 rounded-full bg-muted border-4 flex items-center justify-center transition-all",
-                    isCurrentTurn ? "border-green-500 shadow-lg shadow-green-500/50" : "border-border",
+                    isCurrentTurn ? "border-green-500" : "border-border",
                     isClickable ? "cursor-pointer hover:bg-muted/80" : "cursor-not-allowed opacity-60"
                   )}
                   onClick={() => isClickable && setSelectedOpponent(playerId)}
@@ -423,14 +570,14 @@ const GamePage: React.FC = () => {
                 <div className="mt-2 text-center space-y-1">
                   <div className="flex items-center justify-center gap-2">
                     <div className="text-sm font-bold">{playerUsername}</div>
-                    <Badge variant="outline" className={cn(
-                      "text-xs px-1 py-0 h-5",
-                      game.teams[playerId] === 0 ? "text-red-500 border-red-200" : "text-blue-500 border-blue-200"
+                    <Badge className={cn(
+                      "text-xs px-1 py-0 h-5 text-white border-none",
+                      game.teams[playerId] === 0 ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"
                     )}>
                       {game.teams[playerId] === 0 ? 'Red' : 'Blue'}
                     </Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">{handSize} cards</Badge>
+                  <OpponentHandVisual count={handSize} />
                 </div>
               </div>
             );
@@ -438,7 +585,7 @@ const GamePage: React.FC = () => {
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
             {isInDeclarePhase && isDeclaree ? (
-              <UICard className="w-96 max-h-[60vh] overflow-y-auto">
+              <UICard className="w-96 max-h-[60vh] overflow-y-auto pointer-events-auto">
                 <CardHeader>
                   <CardTitle className="text-sm">Declaration Phase</CardTitle>
                 </CardHeader>
@@ -532,7 +679,7 @@ const GamePage: React.FC = () => {
                 </CardContent>
               </UICard>
             ) : isMyTurn && !isInDeclarePhase && selectedOpponent ? (
-              <UICard className="w-80">
+              <UICard className="w-80 pointer-events-auto">
                 <CardHeader>
                   <CardTitle className="text-sm">Your Turn</CardTitle>
                 </CardHeader>
@@ -585,23 +732,7 @@ const GamePage: React.FC = () => {
                   )}
                 </CardContent>
               </UICard>
-            ) : !isInDeclarePhase ? (
-              <UICard className="w-64">
-                <CardContent className="pt-6">
-                  <div className="text-center text-sm">
-                    {`Waiting for ${usernames.get(game.currentTurn) || 'player'}...`}
-                  </div>
-                </CardContent>
-              </UICard>
-            ) : (
-              <UICard className="w-64">
-                <CardContent className="pt-6">
-                  <div className="text-center text-sm">
-                    {`Waiting for ${usernames.get(game.declarePhase?.declareeId || '') || 'player'} to finish declaring...`}
-                  </div>
-                </CardContent>
-              </UICard>
-            )}
+            ) : null}
           </div>
 
           <div className="absolute left-1/2 bottom-[180px] -translate-x-1/2 z-20">
@@ -611,8 +742,9 @@ const GamePage: React.FC = () => {
                 <Button
                   disabled={!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer}
                   className={cn(
-                    "flex-1 h-12 text-lg",
-                    (!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer) && "opacity-50 cursor-not-allowed"
+                    "flex-1 h-12 text-lg relative overflow-hidden",
+                    (!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer) && 
+                    "opacity-50 cursor-not-allowed after:absolute after:inset-0 after:bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(0,0,0,0.1)_10px,rgba(0,0,0,0.1)_20px)]"
                   )}
                 >
                   Ask
@@ -641,10 +773,37 @@ const GamePage: React.FC = () => {
           )}
           style={{ 
             transform: 'translateX(-50%)',
-            width: `${Math.min(Math.max(playerHand.length * 30, 200), 800)}px`,
+            width: `${Math.min(Math.max(playerHand.length * 55, 250), 1000)}px`,
             height: '140px'
           }}
         >
+          <div className="absolute left-[-140px] bottom-[20px] flex flex-col gap-2 z-50 items-center">
+            <div className={cn(
+              "absolute bottom-full mb-2 bg-black/80 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-opacity duration-200 pointer-events-none",
+              toast.visible ? "opacity-100" : "opacity-0"
+            )}>
+              {toast.message}
+            </div>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-10 w-10 rounded-full shadow-lg bg-background/80 hover:bg-background"
+              onClick={handleSort}
+              title="Sort cards"
+            >
+              <ArrowDownUp className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-10 w-10 rounded-full shadow-lg bg-background/80 hover:bg-background"
+              onClick={handleShuffle}
+              title="Shuffle cards"
+            >
+              <Shuffle className="h-5 w-5" />
+            </Button>
+          </div>
+
           {playerHand.map((card, index) => {
             const totalCards = playerHand.length;
             const radius = 1500; // Radius of the circle
@@ -684,7 +843,7 @@ const GamePage: React.FC = () => {
 
             return (
               <div
-                key={index}
+                key={getCardKey(card)}
                 className="absolute transition-all duration-200 cursor-pointer hover:translate-y-[-20px] hover:z-40"
                 style={{
                   left: '50%',
