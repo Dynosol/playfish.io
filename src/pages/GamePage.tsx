@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, ArrowLeft, Shuffle, ArrowDownUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +26,7 @@ import cardBack from '../assets/cards/card_back.svg';
 import ChatBox from '../components/ChatBox';
 import { useUsernames } from '../hooks/useUsername';
 import CardImage from '../components/CardImage';
+import { getCardImageSrc } from '../utils/cardUtils';
 import { Button } from "@/components/ui/button";
 import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +55,144 @@ const GamePage: React.FC = () => {
   const [localPlayerHand, setLocalPlayerHand] = useState<Card[]>([]);
   const [sortMethod, setSortMethod] = useState<'rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc'>('suit_rank_asc');
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  const [dragState, setDragState] = useState<{
+    index: number;
+    cardKey: string;
+    currentX: number;
+    currentY: number;
+    offsetX: number;
+    offsetY: number;
+    isDropping?: boolean;
+    dropX?: number;
+    dropY?: number;
+    dropRotation?: number;
+  } | null>(null);
+  
+  const dragCardRef = useRef<{ card: Card; imageSrc: string } | null>(null);
+
+  const handleDragStart = (e: React.MouseEvent, index: number, card: Card) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    
+    dragCardRef.current = {
+      card,
+      imageSrc: getCardImageSrc(card)
+    };
+    
+    setDragState({
+      index,
+      cardKey: getCardKey(card),
+      currentX: e.clientX,
+      currentY: e.clientY,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+    });
+  };
+
+  const getFanConfig = (totalCards: number) => {
+    const radius = 1500;
+    const angleStep = 2;
+    const startAngle = -((totalCards - 1) * angleStep) / 2;
+    
+    const firstCardRotation = startAngle; 
+    const lastCardRotation = startAngle + ((totalCards - 1) * angleStep) + ((totalCards - 1) * 0.5);
+    const centerRotation = (firstCardRotation + lastCardRotation) / 2;
+    const centerOffsetRadians = (centerRotation * Math.PI) / 180;
+    const xOffset = radius * Math.sin(centerOffsetRadians);
+
+    return { radius, angleStep, startAngle, xOffset };
+  };
+
+  useEffect(() => {
+    if (!dragState || dragState.isDropping) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setDragState(prev => prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null);
+
+      // Live reordering
+      const FAN_RADIUS = 1500;
+      const CARD_HEIGHT = 168;
+      
+      const totalCards = localPlayerHand.length;
+      const { angleStep, startAngle, xOffset } = getFanConfig(totalCards);
+
+      // Adjust pivotX by xOffset because the fan is shifted left by xOffset
+      const pivotX = (window.innerWidth / 2) - xOffset;
+      const pivotY = window.innerHeight - CARD_HEIGHT + 30 + FAN_RADIUS;
+
+      const dx = e.clientX - pivotX;
+      const dy = e.clientY - pivotY;
+      const angleRad = Math.atan2(dy, dx);
+      const angleDeg = angleRad * (180 / Math.PI);
+      const normalizedAngle = angleDeg + 90;
+
+      let bestIndex = 0;
+      let minDiff = Infinity;
+
+      for (let i = 0; i < totalCards; i++) {
+         const indexRotation = i * 0.5;
+         const slotAngle = startAngle + (i * angleStep) + indexRotation;
+         const diff = Math.abs(normalizedAngle - slotAngle);
+         if (diff < minDiff) {
+           minDiff = diff;
+           bestIndex = i;
+         }
+      }
+
+      if (bestIndex !== dragState.index) {
+         setLocalPlayerHand(prev => {
+           const newHand = [...prev];
+           const [moved] = newHand.splice(dragState.index, 1);
+           newHand.splice(bestIndex, 0, moved);
+           return newHand;
+         });
+         setDragState(prev => prev ? { ...prev, index: bestIndex } : null);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (!dragState) return;
+      
+      const slotElement = document.getElementById(`card-slot-${dragState.index}`);
+      if (slotElement) {
+        const rect = slotElement.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        const totalCards = localPlayerHand.length;
+        const { angleStep, startAngle } = getFanConfig(totalCards);
+        const indexRotation = dragState.index * 0.5;
+        const targetRotation = startAngle + (dragState.index * angleStep) + indexRotation;
+
+        setDragState(prev => prev ? {
+          ...prev,
+          isDropping: true,
+          dropX: centerX - 60,
+          dropY: centerY - 84,
+          dropRotation: targetRotation
+        } : null);
+
+        setTimeout(() => {
+          setDragState(null);
+          dragCardRef.current = null;
+        }, 200);
+      } else {
+        setDragState(null);
+        dragCardRef.current = null;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState, localPlayerHand]);
 
   useEffect(() => {
     if (toast.visible) {
@@ -806,9 +945,7 @@ const GamePage: React.FC = () => {
 
           {playerHand.map((card, index) => {
             const totalCards = playerHand.length;
-            const radius = 1500; // Radius of the circle
-            const angleStep = 2; // Degrees between cards
-            const startAngle = -((totalCards - 1) * angleStep) / 2;
+            const { radius, angleStep, startAngle, xOffset } = getFanConfig(totalCards);
             
             // Add extra rotation based on index to complement the vertical offset
             const indexRotation = index * 0.5; 
@@ -817,47 +954,64 @@ const GamePage: React.FC = () => {
             // Increasing vertical offset for each card
             const translateY = index * 5;
 
-            // Calculate the X offset caused by the rotation to center the fan
-            // We want the center of the fan (average X position) to be at 0
-            // For a given card i, x_i ≈ radius * sin(rotation_i)
-            // Average x ≈ (1/N) * Σ(radius * sin(rotation_i))
-            // We need to shift everything left by Average x
-            
-            // Approximate calculation for the shift needed:
-            // Calculate rotation of first and last card
-            const firstCardRotation = startAngle; // index 0
-            const lastCardRotation = startAngle + ((totalCards - 1) * angleStep) + ((totalCards - 1) * 0.5);
-            
-            // The "visual center" rotation is the average of first and last
-            const centerRotation = (firstCardRotation + lastCardRotation) / 2;
-            
-            // We need to counteract this rotation to center the fan
-            // Shift the transform origin point horizontally? No, easier to shift the container or the cards.
-            // Shifting the cards by rotating the whole system by -centerRotation is the most geometrically correct way
-            // But we want to keep the specific individual rotations requested.
-            // Instead, let's calculate the horizontal displacement caused by 'centerRotation' at 'radius'
-            // x_offset = radius * sin(centerRotation)
-            
-            const centerOffsetRadians = (centerRotation * Math.PI) / 180;
-            const xOffset = radius * Math.sin(centerOffsetRadians);
-
             return (
               <div
+                id={`card-slot-${index}`}
                 key={getCardKey(card)}
-                className="absolute transition-all duration-200 cursor-pointer hover:translate-y-[-20px] hover:z-40"
+                className={cn(
+                  "absolute transition-transform duration-200 cursor-pointer",
+                  !dragState && "hover:translate-y-[-20px] hover:z-40"
+                )}
+                onMouseDown={(e) => handleDragStart(e, index, card)}
+                onDragStart={(e) => e.preventDefault()}
                 style={{
                   left: '50%',
-                  bottom: '-30px', // Translate cards downward
-                  marginLeft: `calc(-60px - ${xOffset}px)`, // Adjust left margin to center the fan
+                  bottom: '-30px',
+                  marginLeft: `calc(-60px - ${xOffset}px)`,
                   transformOrigin: `50% ${radius}px`,
                   transform: `rotate(${rotation}deg) translateY(-${translateY}px)`,
                   zIndex: index,
+                  opacity: dragState?.cardKey === getCardKey(card) ? 0 : 1,
+                  pointerEvents: dragState ? 'none' : 'auto'
                 }}
               >
                 <CardImage card={card} width={120} height={168} />
               </div>
             );
           })}
+        </div>
+      )}
+      
+      {dragState && dragCardRef.current && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: dragState.isDropping ? dragState.dropX : dragState.currentX - dragState.offsetX,
+            top: dragState.isDropping ? dragState.dropY : dragState.currentY - dragState.offsetY,
+            width: 120,
+            height: 168,
+            transform: dragState.isDropping 
+              ? `rotate(${dragState.dropRotation}deg) scale(1.0)` 
+              : 'scale(1.1)',
+            filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))',
+            transition: dragState.isDropping ? 'all 0.2s ease-out' : 'none',
+            zIndex: 100
+          }}
+        >
+           <img
+             src={dragCardRef.current.imageSrc}
+             alt=""
+             width={120}
+             height={168}
+             draggable={false}
+             style={{
+               width: 120,
+               height: 168,
+               objectFit: 'contain',
+               pointerEvents: 'none',
+               userSelect: 'none',
+             } as React.CSSProperties}
+           />
         </div>
       )}
     </div>
