@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
+import { subscribeToUser, type UserDocument } from '../firebase/userService';
 import { useUsernames } from '../hooks/useUsername';
 
 const LobbyPage: React.FC = () => {
@@ -10,6 +11,8 @@ const LobbyPage: React.FC = () => {
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasJoined, setHasJoined] = useState(false);
+  const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
+  const [userCurrentLobby, setUserCurrentLobby] = useState<Lobby | null>(null);
   const isLeavingRef = useRef(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -28,11 +31,46 @@ const LobbyPage: React.FC = () => {
     };
   }, [gameId]);
 
+  // Subscribe to user document to check their current lobby
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToUser(user.uid, (userData) => {
+      setUserDoc(userData);
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  // Subscribe to user's current lobby (if different from this one)
+  useEffect(() => {
+    if (!userDoc?.currentLobbyId || userDoc.currentLobbyId === gameId) {
+      setUserCurrentLobby(null);
+      return;
+    }
+
+    const unsubscribe = subscribeToLobby(userDoc.currentLobbyId, (lobbyData) => {
+      setUserCurrentLobby(lobbyData);
+    });
+
+    return unsubscribe;
+  }, [userDoc?.currentLobbyId, gameId]);
+
   useEffect(() => {
     if (!user || !lobby || !gameId || hasJoined || isLeavingRef.current) return;
-    
+
     if (lobby.players.includes(user.uid)) {
       setHasJoined(true);
+      return;
+    }
+
+    // Don't auto-join if user is in an active game in another lobby
+    if (userCurrentLobby?.status === 'playing') {
+      return;
+    }
+
+    // Don't auto-join if lobby is full or not waiting
+    if (lobby.status !== 'waiting' || lobby.players.length >= lobby.maxPlayers) {
       return;
     }
 
@@ -46,7 +84,7 @@ const LobbyPage: React.FC = () => {
     };
 
     handleJoin();
-  }, [user, lobby, gameId, hasJoined]);
+  }, [user, lobby, gameId, hasJoined, userCurrentLobby]);
 
   useEffect(() => {
     if (!lobby || !gameId || !user || isLeavingRef.current) return;
@@ -145,11 +183,22 @@ const LobbyPage: React.FC = () => {
   const isHost = lobby.createdBy === user?.uid;
   const userTeam = user ? lobby.teams[user.uid] : null;
 
+  const isInActiveGameElsewhere = userCurrentLobby?.status === 'playing';
+  const isInThisLobby = user && lobby.players.includes(user.uid);
+
   return (
     <div>
       <h1>{lobby.name}</h1>
       <Link to="/">Back to Home</Link>
-      
+
+      {isInActiveGameElsewhere && !isInThisLobby && (
+        <div style={{ color: 'red', padding: '10px', border: '1px solid red', margin: '10px 0' }}>
+          You are currently in an active game. You cannot join this lobby until your game ends.
+          <br />
+          <Link to={`/game/${userCurrentLobby.id}`}>Return to your game</Link>
+        </div>
+      )}
+
       <div>
         <h2>Lobby Status: {lobby.status}</h2>
         <h3>Players ({lobby.players.length}/{lobby.maxPlayers})</h3>
@@ -243,10 +292,12 @@ const LobbyPage: React.FC = () => {
             Teams must be even to start the game
           </span>
         )}
-        
-        <button onClick={handleLeaveLobby}>
-          Leave Lobby
-        </button>
+
+        {lobby.status === 'waiting' && (
+          <button onClick={handleLeaveLobby}>
+            Leave Lobby
+          </button>
+        )}
       </div>
 
       {lobby.status === 'playing' && lobby.onGoingGame && (

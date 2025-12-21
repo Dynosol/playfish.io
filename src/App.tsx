@@ -6,11 +6,13 @@ import CreateGamePage from './pages/CreateGamePage';
 import SettingsPage from './pages/SettingsPage';
 import LobbyPage from './pages/LobbyPage';
 import GamePage from './pages/GamePage';
+import ActiveGameBanner from './components/ActiveGameBanner';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
+        <ActiveGameBanner />
         <Routes>
           <Route path="/" element={<StartPage />} />
           <Route path="/join" element={<JoinGamePage />} />

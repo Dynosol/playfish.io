@@ -133,20 +133,20 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
           </div>
 
           {/* Right: Icons */}
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-10 w-10 rounded-full hover:bg-accent/50 [&_svg]:size-8"
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full hover:bg-accent/50 [&_svg]:size-5"
             >
               <CircleHelp />
               <span className="sr-only">Help</span>
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className={cn(
-                "h-10 w-10 rounded-full hover:bg-accent/50 [&_svg]:size-8", 
+                "h-8 w-8 rounded-full hover:bg-accent/50 [&_svg]:size-5",
                 showSettings && "bg-accent/50"
               )}
               onClick={() => setShowSettings(!showSettings)}

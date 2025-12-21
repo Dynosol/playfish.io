@@ -164,8 +164,10 @@ const StartPage: React.FC = () => {
                     <TableBody>
                       {lobbies.map(lobby => {
                         const isFull = (lobby.players?.length || 0) >= (lobby.maxPlayers || 4);
-                        const canJoin = !isFull && lobby.status === 'waiting';
-                        
+                        const isInThisLobby = user && lobby.players?.includes(user.uid);
+                        const isInActiveGame = currentLobby?.status === 'playing';
+                        const canJoin = !isFull && lobby.status === 'waiting' && !isInThisLobby && !isInActiveGame;
+
                         return (
                           <TableRow key={lobby.id}>
                             <TableCell className="font-medium">{lobby.name}</TableCell>
@@ -181,17 +183,25 @@ const StartPage: React.FC = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              {canJoin ? (
-                                <Button 
-                                  size="sm" 
+                              {isInThisLobby ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleSpectate(lobby.id, lobby.status)}
+                                >
+                                  Return
+                                </Button>
+                              ) : canJoin ? (
+                                <Button
+                                  size="sm"
                                   onClick={() => handleJoinGame(lobby.id)}
                                   disabled={joining === lobby.id}
                                 >
                                   {joining === lobby.id ? 'Joining...' : 'Join'}
                                 </Button>
                               ) : (
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="secondary"
                                   onClick={() => handleSpectate(lobby.id, lobby.status)}
                                 >
@@ -219,6 +229,11 @@ const StartPage: React.FC = () => {
               </CardHeader>
               <form onSubmit={handleCreateLobby}>
                 <CardContent className="space-y-4">
+                  {currentLobby?.status === 'playing' && (
+                    <div className="text-sm text-destructive">
+                      You cannot create a new lobby while in an active game.
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="lobbyName">Lobby Name</Label>
                     <Input
@@ -227,16 +242,16 @@ const StartPage: React.FC = () => {
                       value={lobbyName}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyName(e.target.value)}
                       required
-                      disabled={creating}
+                      disabled={creating || currentLobby?.status === 'playing'}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="maxPlayers">Max Players</Label>
-                    <Select 
-                      value={maxPlayers} 
+                    <Select
+                      value={maxPlayers}
                       onValueChange={setMaxPlayers}
-                      disabled={creating}
+                      disabled={creating || currentLobby?.status === 'playing'}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select players" />
@@ -250,7 +265,7 @@ const StartPage: React.FC = () => {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" type="submit" disabled={creating || !lobbyName.trim()}>
+                  <Button className="w-full" type="submit" disabled={creating || !lobbyName.trim() || currentLobby?.status === 'playing'}>
                     {creating ? 'Creating...' : 'Create Lobby'}
                   </Button>
                 </CardFooter>

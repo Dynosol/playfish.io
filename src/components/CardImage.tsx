@@ -20,12 +20,11 @@ const CardImage: React.FC<CardImageProps> = ({ card, className = '', width = 80,
       width={width}
       height={height}
       draggable={false}
-      style={{ 
+      style={{
         objectFit: 'contain',
         userSelect: 'none',
         pointerEvents: 'none',
-        WebkitUserDrag: 'none'
-      }}
+      } as React.CSSProperties}
     />
   );
 };
