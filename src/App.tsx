@@ -6,6 +6,7 @@ import CreateGamePage from './pages/CreateGamePage';
 import SettingsPage from './pages/SettingsPage';
 import LobbyPage from './pages/LobbyPage';
 import GamePage from './pages/GamePage';
+import RulesPage from './pages/RulesPage';
 import ActiveGameBanner from './components/ActiveGameBanner';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/lobby/:gameId" element={<LobbyPage />} />
           <Route path="/game/:gameId" element={<GamePage />} />
+          <Route path="/rules" element={<RulesPage />} />
         </Routes>
       </Router>
     </AuthProvider>

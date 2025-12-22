@@ -146,6 +146,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               variant="ghost"
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-accent/50 [&_svg]:size-5"
+              onClick={() => navigate('/rules')}
             >
               <img src={questionIcon} alt="Help" className="h-5 w-5" />
               <span className="sr-only">Help</span>
