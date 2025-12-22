@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 
-export type ChatCollection = 'lobby' | 'game';
+export const GLOBAL_CHAT_ID = 'global';
 
 export interface ChatMessage {
   id: string;
@@ -20,19 +20,17 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-const getMessagesRef = (id: string, type: ChatCollection) => {
-  const parentCollection = type === 'lobby' ? 'lobbies' : 'games';
-  return collection(db, parentCollection, id, 'messages');
+const getMessagesRef = (chatId: string) => {
+  return collection(db, 'chats', chatId, 'messages');
 };
 
 export const sendMessage = async (
-  id: string,
+  chatId: string,
   userId: string,
   userName: string,
-  message: string,
-  type: ChatCollection = 'game'
+  message: string
 ): Promise<void> => {
-  const messagesRef = getMessagesRef(id, type);
+  const messagesRef = getMessagesRef(chatId);
   await addDoc(messagesRef, {
     userId,
     userName,
@@ -42,12 +40,11 @@ export const sendMessage = async (
 };
 
 export const subscribeToMessages = (
-  id: string,
+  chatId: string,
   callback: (messages: ChatMessage[]) => void,
-  type: ChatCollection = 'game',
   messageLimit: number = 100
 ): (() => void) => {
-  const messagesRef = getMessagesRef(id, type);
+  const messagesRef = getMessagesRef(chatId);
   const messagesQuery = query(
     messagesRef,
     orderBy('timestamp', 'asc'),
@@ -57,8 +54,8 @@ export const subscribeToMessages = (
   return onSnapshot(messagesQuery, (snapshot) => {
     const messages = snapshot.docs.map(doc => {
       const data = doc.data();
-      const timestamp = data.timestamp instanceof Timestamp 
-        ? data.timestamp.toDate() 
+      const timestamp = data.timestamp instanceof Timestamp
+        ? data.timestamp.toDate()
         : data.timestamp?.toDate?.() ?? new Date();
 
       return {
@@ -73,4 +70,3 @@ export const subscribeToMessages = (
     callback(messages);
   });
 };
-

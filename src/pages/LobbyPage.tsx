@@ -251,7 +251,7 @@ const LobbyPage: React.FC = () => {
         {/* Left Sidebar - Chat */}
         {gameId && isInThisLobby && (
           <div className="pl-16 py-4">
-            <ChatBox id={gameId} type="lobby" className="border border-gray-200" />
+            <ChatBox chatId={gameId} className="border border-gray-200" />
           </div>
         )}
 
@@ -304,7 +304,7 @@ const LobbyPage: React.FC = () => {
                 {copied ? 'Copied!' : 'Invite Link'}
               </button>
               <div className={cn(
-                "px-3 py-1 text-sm font-medium",
+                "px-3 py-1 text-sm font-normal",
                 lobby.status === 'waiting'
                   ? "bg-green-500 text-white"
                   : "bg-amber-500 text-white"

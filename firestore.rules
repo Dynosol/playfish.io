@@ -9,24 +9,42 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Lobbies: public read, players can modify
+    // Unified chats collection
+    match /chats/{chatId} {
+      // Allow reading the chat document itself (if it exists)
+      allow read: if request.auth != null;
+      allow write: if false;
+
+      match /messages/{messageId} {
+        // Global chat: any authenticated user can read and write
+        allow read: if request.auth != null && chatId == 'global';
+        allow create: if request.auth != null &&
+                      chatId == 'global' &&
+                      request.resource.data.userId == request.auth.uid;
+
+        // Lobby/game chat: only players in the lobby can read and write
+        allow read: if request.auth != null &&
+                    chatId != 'global' &&
+                    request.auth.uid in get(/databases/$(database)/documents/lobbies/$(chatId)).data.players;
+        allow create: if request.auth != null &&
+                      chatId != 'global' &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.auth.uid in get(/databases/$(database)/documents/lobbies/$(chatId)).data.players;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // Lobbies: public read, players can modify, anyone can join
     match /lobbies/{lobbyId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null &&
                      request.resource.data.createdBy == request.auth.uid;
+      // Allow update if user is already a player OR is joining (being added to players)
       allow update: if request.auth != null &&
-                    request.auth.uid in resource.data.players;
+                    (request.auth.uid in resource.data.players ||
+                     request.auth.uid in request.resource.data.players);
       allow delete: if false;
-
-      // Lobby chat messages
-      match /messages/{messageId} {
-        allow read: if request.auth != null &&
-                    request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players;
-        allow create: if request.auth != null &&
-                      request.resource.data.userId == request.auth.uid &&
-                      request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players;
-        allow update, delete: if false;
-      }
     }
 
     // Deleted lobbies: archive-only
@@ -45,16 +63,6 @@ service cloud.firestore {
       allow update: if request.auth != null &&
                     request.auth.uid in resource.data.players;
       allow delete: if false;
-
-      // Chat messages
-      match /messages/{messageId} {
-        allow read: if request.auth != null &&
-                    request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.players;
-        allow create: if request.auth != null &&
-                      request.resource.data.userId == request.auth.uid &&
-                      request.auth.uid in get(/databases/$(database)/documents/games/$(gameId)).data.players;
-        allow update, delete: if false;
-      }
     }
   }
 }

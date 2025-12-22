@@ -26,6 +26,7 @@ const StartPage: React.FC = () => {
   const [loadingLobbies, setLoadingLobbies] = useState(true);
   const [joining, setJoining] = useState<string | null>(null);
   const [lobbyName, setLobbyName] = useState('');
+  const [lobbyNameError, setLobbyNameError] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<string>("4");
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
@@ -65,16 +66,43 @@ const StartPage: React.FC = () => {
     return unsubscribe;
   }, []);
 
+  const sanitizeLobbyName = (name: string): string => {
+    // Trim whitespace and collapse multiple spaces
+    return name.trim().replace(/\s+/g, ' ');
+  };
+
+  const validateLobbyName = (name: string): string | null => {
+    const sanitized = sanitizeLobbyName(name);
+    if (!sanitized) {
+      return 'Please enter a lobby name';
+    }
+    if (sanitized.length < 2) {
+      return 'Lobby name must be at least 2 characters';
+    }
+    if (sanitized.length > 30) {
+      return 'Lobby name must be 30 characters or less';
+    }
+    return null;
+  };
+
   const handleCreateLobby = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!user || !lobbyName.trim()) return;
+    setLobbyNameError('');
+
+    if (!user) return;
+    if (currentLobby) return;
+
+    const validationError = validateLobbyName(lobbyName);
+    if (validationError) {
+      setLobbyNameError(validationError);
+      return;
+    }
 
     setCreating(true);
-    
+
     try {
       const lobbyId = await createLobby({
-        name: lobbyName,
+        name: sanitizeLobbyName(lobbyName),
         createdBy: user.uid,
         maxPlayers: parseInt(maxPlayers)
       });
@@ -116,12 +144,10 @@ const StartPage: React.FC = () => {
       <Header type="home" />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Chat */}
-        {currentLobby && (
-          <div className="pl-16 py-8 shrink-0">
-            <ChatBox id={currentLobby.id} type="lobby" className="border border-gray-200" />
-          </div>
-        )}
+        {/* Left Sidebar - Global Chat */}
+        <div className="pl-16 py-8 shrink-0">
+          <ChatBox chatId="global" className="border border-gray-200" />
+        </div>
 
         <main className="flex-1 overflow-y-auto px-16 py-8">
           <div className="container mx-auto">
@@ -162,8 +188,8 @@ const StartPage: React.FC = () => {
                               {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                             </TableCell>
                             <TableCell className="py-1">
-                              <Badge className={lobby.status === 'waiting' ? 'bg-purple-500 text-white hover:bg-purple-500' : ''} variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
-                                {lobby.status === 'waiting' ? 'Waiting' : 'In Progress'}
+                              <Badge className={lobby.status === 'waiting' ? 'bg-purple-500 text-white hover:bg-purple-500 font-normal' : 'font-normal'} variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
+                                {lobby.status === 'waiting' ? 'Waiting for players' : 'In Progress'}
                               </Badge>
                             </TableCell>
                             <TableCell className="py-1 text-right">
@@ -176,14 +202,13 @@ const StartPage: React.FC = () => {
                                   Return
                                 </Button>
                               ) : canJoin ? (
-                                <Button
-                                  size="sm"
-                                  className="h-6 w-20 rounded text-xs"
+                                <button
+                                  className="underline hover:opacity-70 disabled:opacity-50"
                                   onClick={() => handleJoinGame(lobby.id)}
                                   disabled={joining === lobby.id}
                                 >
                                   {joining === lobby.id ? 'Joining...' : 'Join'}
-                                </Button>
+                                </button>
                               ) : (
                                 <button
                                   className="text-xs underline hover:opacity-70"
@@ -211,18 +236,25 @@ const StartPage: React.FC = () => {
               </CardHeader>
               <form onSubmit={handleCreateLobby}>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <label htmlFor="lobbyName" className="text-sm font-medium">Lobby name</label>
-                    <input
-                      id="lobbyName"
-                      type="text"
-                      className="w-40 px-2 py-1 border border-gray-300 rounded text-sm"
-                      placeholder="Enter name"
-                      value={lobbyName}
-                      onChange={(e) => setLobbyName(e.target.value)}
-                      required
-                      disabled={creating || !!currentLobby}
-                    />
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-4">
+                      <label htmlFor="lobbyName" className="text-sm font-medium">Lobby name</label>
+                      <input
+                        id="lobbyName"
+                        type="text"
+                        className={`w-40 px-2 py-1 border rounded text-sm ${lobbyNameError ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="Enter name"
+                        value={lobbyName}
+                        onChange={(e) => {
+                          setLobbyName(e.target.value);
+                          if (lobbyNameError) setLobbyNameError('');
+                        }}
+                        disabled={creating || !!currentLobby}
+                      />
+                    </div>
+                    {lobbyNameError && (
+                      <p className="text-xs text-red-500 text-right">{lobbyNameError}</p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -242,9 +274,9 @@ const StartPage: React.FC = () => {
                 </CardContent>
                 <CardFooter>
                   <Button
-                    className={currentLobby ? "w-full rounded bg-lime-500 hover:bg-lime-600 text-white" : "w-full rounded bg-purple-500 hover:bg-purple-500/90 text-white"}
+                    className={currentLobby ? "w-full rounded bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed" : "w-full rounded bg-purple-500 hover:bg-purple-500/90 text-white"}
                     type="submit"
-                    disabled={creating || !lobbyName.trim() || !!currentLobby}
+                    disabled={creating || !!currentLobby}
                   >
                     {creating ? 'Creating...' : currentLobby?.status === 'playing' ? 'You are currently in a game' : currentLobby ? 'You are currently in a lobby' : 'Create Lobby'}
                   </Button>

@@ -10,6 +10,7 @@ import { subscribeToUser, updateUsername } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
 import { cn } from "@/lib/utils";
 import fishIcon from '@/assets/favicon.png';
+import { getUserColorHex } from '../utils/userColors';
 
 interface HeaderProps {
   type: 'home' | 'game';
@@ -116,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                   </div>
                 ) : (
                   <>
-                    <span>Welcome, {userData?.username || 'StarUnicorn'}</span>
+                    <span>Welcome, <span style={{ color: getUserColorHex(userData?.color || 'slate') }}>{userData?.username || 'StarUnicorn'}</span></span>
                     <Button 
                       size="icon" 
                       variant="ghost" 

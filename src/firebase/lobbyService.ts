@@ -17,6 +17,7 @@ import {
 import { db } from './config';
 import { updateUserCurrentLobby } from './userService';
 import { createGame } from './gameService';
+import { generateLobbyId } from '../utils/lobbyIdGenerator';
 
 export interface Lobby {
   id: string;
@@ -129,8 +130,28 @@ const leaveCurrentLobby = async (userId: string, excludeLobbyId?: string): Promi
 
 export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> => {
   await leaveCurrentLobby(lobbyData.createdBy);
-  
-  const docRef = await addDoc(collection(db, 'lobbies'), {
+
+  // Generate a unique word-based lobby ID
+  let lobbyId = generateLobbyId();
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  // Check for collisions and regenerate if necessary
+  while (attempts < maxAttempts) {
+    const existingDoc = await getDoc(doc(db, 'lobbies', lobbyId));
+    if (!existingDoc.exists()) {
+      break;
+    }
+    lobbyId = generateLobbyId();
+    attempts++;
+  }
+
+  if (attempts >= maxAttempts) {
+    throw new Error('Failed to generate unique lobby ID');
+  }
+
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  await setDoc(lobbyRef, {
     ...lobbyData,
     players: [lobbyData.createdBy],
     teams: { [lobbyData.createdBy]: null },
@@ -139,10 +160,10 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
     historicalScores: { 0: 0, 1: 0 },
     createdAt: serverTimestamp()
   });
-  
-  await updateUserCurrentLobby(lobbyData.createdBy, docRef.id);
-  
-  return docRef.id;
+
+  await updateUserCurrentLobby(lobbyData.createdBy, lobbyId);
+
+  return lobbyId;
 };
 
 export const joinLobby = async (lobbyId: string, userId: string): Promise<void> => {

@@ -45,3 +45,29 @@ export const useUsernames = (uids: string[]): Map<string, string | null> => {
   return usernames;
 };
 
+export const useUsers = (uids: string[]): Map<string, UserDocument | null> => {
+  const [users, setUsers] = useState<Map<string, UserDocument | null>>(new Map());
+  const prevUidsKeyRef = useRef<string>('');
+
+  const uidsKey = useMemo(() => [...uids].sort().join(','), [uids]);
+
+  useEffect(() => {
+    if (uidsKey === prevUidsKeyRef.current) return;
+    prevUidsKeyRef.current = uidsKey;
+
+    if (uids.length === 0) {
+      setUsers(new Map());
+      return;
+    }
+
+    return subscribeToUsers(uids, (userDocs) => {
+      const map = new Map<string, UserDocument | null>();
+      userDocs.forEach(u => map.set(u.uid, u));
+      uids.forEach(uid => { if (!map.has(uid)) map.set(uid, null); });
+      setUsers(map);
+    });
+  }, [uidsKey, uids]);
+
+  return users;
+};
+

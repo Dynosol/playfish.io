@@ -45,6 +45,21 @@ export default {
         700: '#15803d',  // Dark green
         800: '#166534',  // Darker green
       },
+      // User colors - unique dark pastels for auto-assigned user colors
+      user: {
+        mauve: '#8B6B7B',      // Dusty mauve
+        slate: '#5E6B8A',      // Slate blue
+        clay: '#9B7162',       // Terracotta clay
+        teal: '#4A7C7C',       // Deep teal
+        plum: '#7B5E7B',       // Muted plum
+        ochre: '#9B8A5E',      // Dark ochre
+        sage: '#6B7B62',       // Dark sage
+        coral: '#9B6B6B',      // Dusty coral
+        indigo: '#5E5E8A',     // Muted indigo
+        wine: '#8A5E6B',       // Wine/burgundy
+        bronze: '#8A7B5E',     // Bronze
+        steel: '#6B7B8A',      // Steel blue
+      },
       // Semantic aliases (for backwards compatibility with shadcn)
       background: 'hsl(var(--background))',
       foreground: 'hsl(var(--foreground))',

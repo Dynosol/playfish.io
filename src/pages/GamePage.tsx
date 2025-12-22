@@ -591,7 +591,7 @@ const GamePage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Chat */}
         <div className="pl-16 py-4 shrink-0">
-          <ChatBox id={game.id} type="game" className="border border-gray-200" />
+          <ChatBox chatId={gameId!} className="border border-gray-200" />
         </div>
 
         {/* Game Area */}

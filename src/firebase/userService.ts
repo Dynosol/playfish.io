@@ -13,10 +13,12 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { generateUsername } from '../utils/usernameGenerator';
+import { getRandomUserColor, type UserColorName } from '../utils/userColors';
 
 export interface UserDocument {
   uid: string;
   username: string;
+  color: UserColorName;
   currentLobbyId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,14 +30,21 @@ export const createOrUpdateUser = async (uid: string): Promise<void> => {
   const userSnap = await getDoc(userRef);
   
   if (userSnap.exists()) {
-    await setDoc(userRef, {
+    const data = userSnap.data();
+    // Migrate existing users without color
+    const updates: Record<string, unknown> = {
       updatedAt: serverTimestamp(),
       lastOnline: serverTimestamp()
-    }, { merge: true });
+    };
+    if (!data.color) {
+      updates.color = getRandomUserColor();
+    }
+    await setDoc(userRef, updates, { merge: true });
   } else {
     await setDoc(userRef, {
       uid,
       username: generateUsername(),
+      color: getRandomUserColor(),
       currentLobbyId: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

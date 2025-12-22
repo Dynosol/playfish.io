@@ -1,34 +1,43 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { sendMessage, subscribeToMessages, type ChatMessage, type ChatCollection } from '../firebase/chatService';
-import { useUsername } from '../hooks/useUsername';
+import { sendMessage, subscribeToMessages, GLOBAL_CHAT_ID, type ChatMessage } from '../firebase/chatService';
+import { useUsername, useUsers } from '../hooks/useUsername';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getUserColorHex } from '../utils/userColors';
 
 interface ChatBoxProps {
-  id: string;
-  type: ChatCollection;
+  chatId: string;
   className?: string;
 }
 
-const ChatBox: React.FC<ChatBoxProps> = ({ id, type, className }) => {
+const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
   const username = useUsername(user?.uid);
 
-  useEffect(() => {
-    if (!id) return;
+  const isGlobalChat = chatId === GLOBAL_CHAT_ID;
 
-    const unsubscribe = subscribeToMessages(id, (newMessages) => {
+  // Get unique user IDs from messages to fetch their colors
+  const messageUserIds = useMemo(() =>
+    [...new Set(messages.map(m => m.userId))],
+    [messages]
+  );
+  const usersData = useUsers(messageUserIds);
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    const unsubscribe = subscribeToMessages(chatId, (newMessages) => {
       setMessages(newMessages);
-    }, type);
+    });
 
     return () => {
       unsubscribe();
     };
-  }, [id, type]);
+  }, [chatId]);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +79,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ id, type, className }) => {
     setSending(true);
     try {
       const userName = username || `User ${user.uid.slice(0, 16)}`;
-      await sendMessage(id, user.uid, userName, inputMessage, type);
+      await sendMessage(chatId, user.uid, userName, inputMessage);
       setInputMessage('');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -83,7 +92,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ id, type, className }) => {
     <Card className={cn("w-72 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)}>
       <CardHeader className="p-3 flex flex-row items-center space-y-0">
         <CardTitle className="text-sm font-medium">
-          Chat
+          {isGlobalChat ? 'Global Chat' : 'Chat'}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex flex-col">
@@ -108,7 +117,10 @@ const ChatBox: React.FC<ChatBoxProps> = ({ id, type, className }) => {
                     )}
                   >
                     {showName && (
-                      <span className="text-xs text-muted-foreground mb-0.5">
+                      <span
+                        className="text-xs mb-0.5"
+                        style={{ color: getUserColorHex(usersData.get(msg.userId)?.color || 'slate') }}
+                      >
                         {isCurrentUser ? 'You' : msg.userName}
                       </span>
                     )}
