@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser, updateUsername } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
 import { cn } from "@/lib/utils";
+import fishIcon from '@/assets/favicon.png';
 
 interface HeaderProps {
   type: 'home' | 'game';
@@ -77,13 +78,14 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
 
   return (
     <>
-      <header className={cn("w-full z-50", className)}>
+      <header className={cn("w-full z-50 sticky top-0 bg-background border-b", className)}>
         <div className="container mx-auto px-4 h-16 flex items-center justify-between relative">
           {/* Left: Logo */}
-          <div 
-            className="flex items-center gap-2 font-bold text-xl cursor-pointer hover:opacity-80 transition-opacity" 
+          <div
+            className="flex items-center gap-0.5 text-xl cursor-pointer hover:opacity-80 transition-opacity"
             onClick={handleHomeClick}
           >
+            <img src={fishIcon} alt="Fish" className="h-7 w-7" />
             <span>playfish.io</span>
           </div>
 
@@ -105,10 +107,10 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                         if (e.key === 'Escape') setIsEditing(false);
                       }}
                     />
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-green-100 dark:hover:bg-green-900/30" onClick={handleSaveUsername} disabled={loading}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-gray-100" onClick={handleSaveUsername} disabled={loading}>
                       <Check className="h-4 w-4 text-green-500" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/30" onClick={() => setIsEditing(false)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-gray-100" onClick={() => setIsEditing(false)}>
                       <X className="h-4 w-4 text-red-500" />
                     </Button>
                   </div>
@@ -161,9 +163,9 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
       {/* Settings Popup */}
       {showSettings && (
         <div className="fixed top-20 right-4 z-50 w-80 animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
-          <Card className="shadow-xl border-2">
+          <Card className="border border-gray-200">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Settings
               </CardTitle>

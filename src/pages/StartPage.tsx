@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser } from '../firebase/userService';
+import { useUsernames } from '../hooks/useUsername';
 import { subscribeToLobby, subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
 import type { UserDocument } from '../firebase/userService';
 import type { Lobby } from '../firebase/lobbyService';
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import Header from '@/components/Header';
+import ChatBox from '@/components/ChatBox';
 
 const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -28,6 +29,9 @@ const StartPage: React.FC = () => {
   const [maxPlayers, setMaxPlayers] = useState<string>("4");
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
+
+  const hostUids = useMemo(() => lobbies.map(l => l.createdBy).filter(Boolean), [lobbies]);
+  const hostUsernames = useUsernames(hostUids);
 
   useEffect(() => {
     if (!user) return;
@@ -108,17 +112,22 @@ const StartPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Header type="home" />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Chat */}
+        {currentLobby && (
+          <div className="pl-16 py-8 shrink-0">
+            <ChatBox id={currentLobby.id} type="lobby" className="border border-gray-200" />
+          </div>
+        )}
+
+        <main className="flex-1 overflow-y-auto px-16 py-8">
+          <div className="container mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Center: Lobby List */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">Open Lobbies</h2>
-            </div>
-            
             <Card>
               <CardContent className="p-0">
                 {loadingLobbies ? (
@@ -130,11 +139,12 @@ const StartPage: React.FC = () => {
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Lobby Name</TableHead>
-                        <TableHead>Players</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                      <TableRow className="h-8">
+                        <TableHead className="py-1">Lobby Name</TableHead>
+                        <TableHead className="py-1">Host</TableHead>
+                        <TableHead className="py-1">Players</TableHead>
+                        <TableHead className="py-1">Status</TableHead>
+                        <TableHead className="py-1 text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -145,24 +155,22 @@ const StartPage: React.FC = () => {
                         const canJoin = !isFull && lobby.status === 'waiting' && !isInThisLobby && !isInActiveGame;
 
                         return (
-                          <TableRow key={lobby.id}>
-                            <TableCell className="font-medium">{lobby.name}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
-                              </div>
+                          <TableRow key={lobby.id} className="h-8">
+                            <TableCell className="py-1 font-medium">{lobby.name}</TableCell>
+                            <TableCell className="py-1">{hostUsernames.get(lobby.createdBy) || '...'}</TableCell>
+                            <TableCell className="py-1">
+                              {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                             </TableCell>
-                            <TableCell>
-                              <Badge variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
+                            <TableCell className="py-1">
+                              <Badge className={lobby.status === 'waiting' ? 'bg-purple-500 text-white hover:bg-purple-500' : ''} variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
                                 {lobby.status === 'waiting' ? 'Waiting' : 'In Progress'}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="py-1 text-right">
                               {isInThisLobby ? (
                                 <Button
                                   size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  className="h-6 w-20 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
                                   onClick={() => handleSpectate(lobby.id, lobby.status)}
                                 >
                                   Return
@@ -170,19 +178,19 @@ const StartPage: React.FC = () => {
                               ) : canJoin ? (
                                 <Button
                                   size="sm"
+                                  className="h-6 w-20 rounded text-xs"
                                   onClick={() => handleJoinGame(lobby.id)}
                                   disabled={joining === lobby.id}
                                 >
                                   {joining === lobby.id ? 'Joining...' : 'Join'}
                                 </Button>
                               ) : (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
+                                <button
+                                  className="text-xs underline hover:opacity-70"
                                   onClick={() => handleSpectate(lobby.id, lobby.status)}
                                 >
                                   Spectate
-                                </Button>
+                                </button>
                               )}
                             </TableCell>
                           </TableRow>
@@ -196,60 +204,58 @@ const StartPage: React.FC = () => {
           </div>
 
           {/* Right Center: Create Game */}
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight">Create Game</h2>
+          <div>
             <Card>
               <CardHeader>
-                <CardTitle>New Lobby</CardTitle>
                 <CardDescription>Set up a new game room for you and your friends.</CardDescription>
               </CardHeader>
               <form onSubmit={handleCreateLobby}>
                 <CardContent className="space-y-4">
-                  {currentLobby?.status === 'playing' && (
-                    <div className="text-sm text-destructive">
-                      You cannot create a new lobby while in an active game.
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="lobbyName">Lobby Name</Label>
-                    <Input
+                  <div className="flex items-center justify-between gap-4">
+                    <label htmlFor="lobbyName" className="text-sm font-medium">Lobby name</label>
+                    <input
                       id="lobbyName"
-                      placeholder="Enter lobby name"
+                      type="text"
+                      className="w-40 px-2 py-1 border border-gray-300 rounded text-sm"
+                      placeholder="Enter name"
                       value={lobbyName}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLobbyName(e.target.value)}
+                      onChange={(e) => setLobbyName(e.target.value)}
                       required
-                      disabled={creating || currentLobby?.status === 'playing'}
+                      disabled={creating || !!currentLobby}
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="maxPlayers">Max Players</Label>
-                    <Select
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="maxPlayers" className="text-sm font-medium">Number of players</label>
+                    <select
+                      id="maxPlayers"
+                      className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
                       value={maxPlayers}
-                      onValueChange={setMaxPlayers}
-                      disabled={creating || currentLobby?.status === 'playing'}
+                      onChange={(e) => setMaxPlayers(e.target.value)}
+                      disabled={creating || !!currentLobby}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select players" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="4">4 Players</SelectItem>
-                        <SelectItem value="6">6 Players</SelectItem>
-                        <SelectItem value="8">8 Players</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <option value="4">4</option>
+                      <option value="6">6</option>
+                      <option value="8">8</option>
+                    </select>
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button className="w-full" type="submit" disabled={creating || !lobbyName.trim() || currentLobby?.status === 'playing'}>
-                    {creating ? 'Creating...' : 'Create Lobby'}
+                  <Button
+                    className={currentLobby ? "w-full rounded bg-lime-500 hover:bg-lime-600 text-white" : "w-full rounded bg-purple-500 hover:bg-purple-500/90 text-white"}
+                    type="submit"
+                    disabled={creating || !lobbyName.trim() || !!currentLobby}
+                  >
+                    {creating ? 'Creating...' : currentLobby?.status === 'playing' ? 'You are currently in a game' : currentLobby ? 'You are currently in a lobby' : 'Create Lobby'}
                   </Button>
                 </CardFooter>
               </form>
             </Card>
           </div>
-        </div>
-      </main>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

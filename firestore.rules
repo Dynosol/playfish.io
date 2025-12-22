@@ -17,6 +17,16 @@ service cloud.firestore {
       allow update: if request.auth != null &&
                     request.auth.uid in resource.data.players;
       allow delete: if false;
+
+      // Lobby chat messages
+      match /messages/{messageId} {
+        allow read: if request.auth != null &&
+                    request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players;
+        allow create: if request.auth != null &&
+                      request.resource.data.userId == request.auth.uid &&
+                      request.auth.uid in get(/databases/$(database)/documents/lobbies/$(lobbyId)).data.players;
+        allow update, delete: if false;
+      }
     }
 
     // Deleted lobbies: archive-only

@@ -10,6 +10,8 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 
+export type ChatCollection = 'lobby' | 'game';
+
 export interface ChatMessage {
   id: string;
   userId: string;
@@ -18,13 +20,19 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+const getMessagesRef = (id: string, type: ChatCollection) => {
+  const parentCollection = type === 'lobby' ? 'lobbies' : 'games';
+  return collection(db, parentCollection, id, 'messages');
+};
+
 export const sendMessage = async (
-  gameId: string,
+  id: string,
   userId: string,
   userName: string,
-  message: string
+  message: string,
+  type: ChatCollection = 'game'
 ): Promise<void> => {
-  const messagesRef = collection(db, 'games', gameId, 'messages');
+  const messagesRef = getMessagesRef(id, type);
   await addDoc(messagesRef, {
     userId,
     userName,
@@ -34,11 +42,12 @@ export const sendMessage = async (
 };
 
 export const subscribeToMessages = (
-  gameId: string,
+  id: string,
   callback: (messages: ChatMessage[]) => void,
+  type: ChatCollection = 'game',
   messageLimit: number = 100
 ): (() => void) => {
-  const messagesRef = collection(db, 'games', gameId, 'messages');
+  const messagesRef = getMessagesRef(id, type);
   const messagesQuery = query(
     messagesRef,
     orderBy('timestamp', 'asc'),

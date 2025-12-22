@@ -545,7 +545,7 @@ const GamePage: React.FC = () => {
                 key={`top-${i}`}
                 src={cardBack}
                 alt="card back"
-                className="shadow-sm rounded-sm border-white border-[0.5px] bg-red-500 block"
+                className="border-white border bg-red-500 block"
                 style={{
                   width: `${cardWidth}px`,
                   height: `${cardHeight}px`,
@@ -563,7 +563,7 @@ const GamePage: React.FC = () => {
                   key={`bottom-${i}`}
                   src={cardBack}
                   alt="card back"
-                  className="shadow-sm rounded-sm border-white border-[0.5px] bg-red-500 block"
+                  className="border-white border bg-red-500 block"
                   style={{
                     width: `${cardWidth}px`,
                     height: `${cardHeight}px`,
@@ -575,45 +575,54 @@ const GamePage: React.FC = () => {
             </div>
           )}
         </div>
-        <span className="text-xs font-bold text-muted-foreground">{count} left</span>
+        <span className="text-xs font-semibold text-muted-foreground">{count} left</span>
       </div>
     );
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background relative">
-      <Header 
-        type="game" 
-        roomName={lobby.name} 
-        className="absolute top-0 left-0 right-0 bg-background/95 backdrop-blur" 
+    <div className="h-screen w-screen overflow-hidden bg-background flex flex-col">
+      <Header
+        type="game"
+        roomName={lobby.name}
+        className="bg-background/95 backdrop-blur shrink-0"
       />
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Chat */}
+        <div className="pl-16 py-4 shrink-0">
+          <ChatBox id={game.id} type="game" className="border border-gray-200" />
+        </div>
+
+        {/* Game Area */}
+        <div className="flex-1 relative">
 
       {/* Scores (Center Table) */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col gap-4 items-center pointer-events-none">
-        <div className="text-2xl font-bold bg-background/50 p-4 rounded-xl border shadow-sm backdrop-blur-sm">
+        <div className="text-2xl font-semibold bg-white p-4 border border-gray-200">
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-center">
-              <span className="text-sm text-red-500 uppercase tracking-wider font-bold">Red Team</span>
-              <span className="text-4xl">{game.scores?.[0] || 0}</span>
+              <span className="text-sm text-red-500 uppercase tracking-wider font-semibold">Red Team</span>
+              <span className="text-2xl">{game.scores?.[0] || 0}</span>
             </div>
             <div className="h-12 w-px bg-border mx-2" />
             <div className="flex flex-col items-center">
-              <span className="text-sm text-blue-500 uppercase tracking-wider font-bold">Blue Team</span>
-              <span className="text-4xl">{game.scores?.[1] || 0}</span>
+              <span className="text-sm text-blue-500 uppercase tracking-wider font-semibold">Blue Team</span>
+              <span className="text-2xl">{game.scores?.[1] || 0}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status Announcement (Top Center - below header) */}
-      <div className="absolute top-[72px] left-0 right-0 z-30 px-4 flex justify-center pointer-events-none">
+      {/* Status Announcement (Top Center) */}
+      <div className="absolute top-4 left-0 right-0 z-30 px-4 flex justify-center pointer-events-none">
         <div className="pointer-events-auto max-w-md">
           {!isInDeclarePhase ? (
-            <div className="bg-background/95 backdrop-blur shadow-md border rounded-lg px-4 py-2">
+            <div className="bg-white border border-gray-200 px-4 py-2">
               <div className="text-sm text-center">
                 {isMyTurn ? (
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-base text-green-600">It is your turn!</span>
+                    <span className="font-semibold text-base text-green-600">It is your turn!</span>
                     <span className="text-xs text-muted-foreground">Press on the player you wish to ask.</span>
                   </div>
                 ) : (
@@ -624,10 +633,10 @@ const GamePage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-background/95 backdrop-blur shadow-md border rounded-lg px-4 py-2">
+            <div className="bg-white border border-gray-200 px-4 py-2">
               <div className="text-sm text-center">
                 {isDeclaree ? (
-                  <span className="font-bold text-amber-600">You are declaring!</span>
+                  <span className="font-semibold text-amber-600">You are declaring!</span>
                 ) : (
                   <span className="font-medium">
                     {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} has started declaring...
@@ -637,10 +646,6 @@ const GamePage: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="absolute bottom-4 right-4 z-50">
-        <ChatBox gameId={game.id} />
       </div>
 
       {isGameOver && winningTeam !== null ? (
@@ -708,7 +713,7 @@ const GamePage: React.FC = () => {
                 </div>
                 <div className="mt-2 text-center space-y-1">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="text-sm font-bold">{playerUsername}</div>
+                    <div className="text-sm font-semibold">{playerUsername}</div>
                     <Badge className={cn(
                       "text-xs px-1 py-0 h-5 text-white border-none",
                       game.teams[playerId] === 0 ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"
@@ -875,7 +880,7 @@ const GamePage: React.FC = () => {
           </div>
 
           <div className="absolute left-1/2 bottom-[180px] -translate-x-1/2 z-20">
-            <fieldset className="border-2 border-border rounded-lg p-4 bg-background w-[500px]">
+            <fieldset className="border-2 border-border p-4 bg-background w-[500px]">
               <legend className="px-2 text-xs font-semibold">Available actions:</legend>
               <div className="flex gap-4">
                 <Button
@@ -908,7 +913,7 @@ const GamePage: React.FC = () => {
         <div
           className={cn(
             "fixed bottom-0 left-1/2 z-30 flex justify-center",
-            isMyTurn && "ring-4 ring-green-500 rounded-t-lg ring-offset-2 ring-offset-background"
+            isMyTurn && "ring-4 ring-green-500 ring-offset-2 ring-offset-background"
           )}
           style={{ 
             transform: 'translateX(-50%)',
@@ -926,7 +931,7 @@ const GamePage: React.FC = () => {
             <Button
               variant="secondary"
               size="icon"
-              className="h-10 w-10 rounded-full shadow-lg bg-background/80 hover:bg-background"
+              className="h-10 w-10 bg-white border border-gray-200 hover:bg-gray-50"
               onClick={handleSort}
               title="Sort cards"
             >
@@ -935,7 +940,7 @@ const GamePage: React.FC = () => {
             <Button
               variant="secondary"
               size="icon"
-              className="h-10 w-10 rounded-full shadow-lg bg-background/80 hover:bg-background"
+              className="h-10 w-10 bg-white border border-gray-200 hover:bg-gray-50"
               onClick={handleShuffle}
               title="Shuffle cards"
             >
@@ -1014,6 +1019,8 @@ const GamePage: React.FC = () => {
            />
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };
