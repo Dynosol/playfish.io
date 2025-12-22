@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Crown, Users, ArrowLeftRight, Shuffle, Play, LogOut, Copy, Check, AlertCircle, User } from 'lucide-react';
+import { Crown, Users, ArrowLeftRight, Shuffle, Play, LogOut, Copy, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
