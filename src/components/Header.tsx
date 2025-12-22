@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, CircleHelp, Pencil, Check, X, User } from 'lucide-react';
+import { Check, X, User } from 'lucide-react';
+import pencilIcon from '@/assets/pencil.png';
+import questionIcon from '@/assets/questionmark.png';
+import gearIcon from '@/assets/gear.png';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +45,6 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
     return unsubscribe;
   }, [user]);
 
-  // Logic for inline header editing
   const handleSaveUsername = async () => {
       if (!user || !newUsername.trim()) return;
       setLoading(true);
@@ -56,7 +58,6 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
       }
   };
 
-  // Logic for popup settings editing
   const handleSaveSettingsUsername = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !settingsUsername.trim()) return;
@@ -96,38 +97,42 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               <span className="font-medium text-lg">Game Room: {roomName}</span>
             ) : (
               <div className="flex items-center gap-2 font-medium text-lg">
+                <span>Welcome,{' '}</span>
                 {isEditing ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
-                      className="h-8 w-40 text-base"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveUsername();
-                        if (e.key === 'Escape') setIsEditing(false);
-                      }}
-                    />
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-gray-100" onClick={handleSaveUsername} disabled={loading}>
-                      <Check className="h-4 w-4 text-green-500" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-gray-100" onClick={() => setIsEditing(false)}>
-                      <X className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
+                  <input
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="border-b border-gray-400 bg-transparent outline-none text-lg font-medium w-32"
+                    style={{ color: getUserColorHex(userData?.color || 'slate') }}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveUsername();
+                      if (e.key === 'Escape') {
+                        setNewUsername(userData?.username || '');
+                        setIsEditing(false);
+                      }
+                    }}
+                    onBlur={handleSaveUsername}
+                    disabled={loading}
+                  />
                 ) : (
                   <>
-                    <span>Welcome, <span style={{ color: getUserColorHex(userData?.color || 'slate') }}>{userData?.username || 'StarUnicorn'}</span></span>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground" 
+                    <span
+                      className="underline decoration-1 underline-offset-2"
+                      style={{ color: getUserColorHex(userData?.color || 'slate') }}
+                    >
+                      {userData?.username || 'StarUnicorn'}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       onClick={() => {
                         setNewUsername(userData?.username || '');
                         setIsEditing(true);
                       }}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <img src={pencilIcon} alt="Edit" className="h-4 w-4" />
                     </Button>
                   </>
                 )}
@@ -142,7 +147,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               size="icon"
               className="h-8 w-8 rounded-full hover:bg-accent/50 [&_svg]:size-5"
             >
-              <CircleHelp />
+              <img src={questionIcon} alt="Help" className="h-5 w-5" />
               <span className="sr-only">Help</span>
             </Button>
             <Button
@@ -154,7 +159,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               )}
               onClick={() => setShowSettings(!showSettings)}
             >
-              <Settings />
+              <img src={gearIcon} alt="Settings" className="h-5 w-5" />
               <span className="sr-only">Settings</span>
             </Button>
           </div>
@@ -167,7 +172,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
           <Card className="border border-gray-200">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Settings className="h-5 w-5" />
+                <img src={gearIcon} alt="Settings" className="h-5 w-5" />
                 Settings
               </CardTitle>
               <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2" onClick={() => setShowSettings(false)}>
@@ -200,8 +205,6 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                   )}
                 </div>
               </form>
-              
-              {/* Can add more settings here in the future (Theme, Sound, etc.) */}
             </CardContent>
           </Card>
         </div>

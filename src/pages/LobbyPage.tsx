@@ -67,7 +67,8 @@ const LobbyPage: React.FC = () => {
       return;
     }
 
-    if (userCurrentLobby?.status === 'playing') {
+    // Don't auto-join if user is already in another lobby or game
+    if (userCurrentLobby) {
       return;
     }
 
@@ -87,13 +88,6 @@ const LobbyPage: React.FC = () => {
     handleJoin();
   }, [user, lobby, gameId, hasJoined, userCurrentLobby]);
 
-  useEffect(() => {
-    if (!lobby || !gameId || !user || isLeavingRef.current) return;
-
-    if (lobby.status === 'playing' && lobby.onGoingGame && lobby.players.includes(user.uid)) {
-      navigate(`/game/${gameId}`);
-    }
-  }, [lobby, gameId, user, navigate]);
 
   const handleLeaveLobby = async () => {
     if (!user || !gameId) return;
@@ -249,215 +243,242 @@ const LobbyPage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Chat */}
-        {gameId && isInThisLobby && (
-          <div className="pl-16 py-4">
+        <div className="pl-16 py-8 shrink-0">
+          {gameId && isInThisLobby ? (
             <ChatBox chatId={gameId} className="border border-gray-200" />
-          </div>
-        )}
-
-        <main className="flex-1 overflow-y-auto px-16 py-8">
-          <div className="max-w-5xl mx-auto">
-        {/* Warning if in another active game */}
-        {isInActiveGameElsewhere && !isInThisLobby && (
-          <div className="mb-6 border border-red-500 p-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <div className="flex-1">
-                <p className="font-medium text-red-500">You're in an active game</p>
-                <p className="text-sm text-gray-500">Finish your current game before joining this lobby.</p>
-              </div>
-              <button
-                onClick={() => navigate(`/game/${userCurrentLobby?.id}`)}
-                className="px-4 py-2 bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
-              >
-                Return to Game
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Lobby Header */}
-        <div className="sticky top-0 z-10 bg-white p-6 mb-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold">{lobby.name}</h1>
-              <div className="flex items-center gap-4 mt-2 text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <Users className="h-4 w-4" />
-                  {lobby.players.length}/{lobby.maxPlayers} players
-                </span>
-                {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
-                  <span>
-                    Series: <span className="text-red-500 font-medium">{historicalScores[0]}</span>
-                    <span className="mx-1">-</span>
-                    <span className="text-blue-500 font-medium">{historicalScores[1]}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleCopyInviteLink}
-                className="flex items-center gap-2 underline transition-all"
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copied!' : 'Invite Link'}
-              </button>
-              <div className={cn(
-                "px-3 py-1 text-sm font-normal",
-                lobby.status === 'waiting'
-                  ? "bg-green-500 text-white"
-                  : "bg-amber-500 text-white"
-              )}>
-                {lobby.status === 'waiting' ? 'Waiting for players' : 'In Progress'}
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="w-72" />
+          )}
         </div>
 
-        {/* Teams */}
-        {lobby.status === 'waiting' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Red Team */}
-            <div className="p-6 border border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-red-500">Red Team</h2>
-                <span className="text-sm">
-                  {team0Players.length}
-                </span>
-              </div>
-              <div className="space-y-2 min-h-[120px]">
-                {team0Players.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">No players yet</p>
-                ) : (
-                  team0Players.map(playerId => (
-                    <PlayerRow key={playerId} playerId={playerId} team={0} showSwap />
-                  ))
-                )}
-              </div>
-              {user && userTeam !== 0 && isInThisLobby && (
-                <button
-                  onClick={() => handleJoinTeam(0)}
-                  className="w-full mt-4 py-3 bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
-                >
-                  Join Red Team
-                </button>
-              )}
-            </div>
-
-            {/* Blue Team */}
-            <div className="p-6 border border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-blue-500">Blue Team</h2>
-                <span className="text-sm">
-                  {team1Players.length}
-                </span>
-              </div>
-              <div className="space-y-2 min-h-[120px]">
-                {team1Players.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">No players yet</p>
-                ) : (
-                  team1Players.map(playerId => (
-                    <PlayerRow key={playerId} playerId={playerId} team={1} showSwap />
-                  ))
-                )}
-              </div>
-              {user && userTeam !== 1 && isInThisLobby && (
-                <button
-                  onClick={() => handleJoinTeam(1)}
-                  className="w-full mt-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors"
-                >
-                  Join Blue Team
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Unassigned Players */}
-        {lobby.status === 'waiting' && unassignedPlayers.length > 0 && (
-          <div className="p-4 mb-6">
-            <h3 className="text-sm mb-2">Unassigned Players</h3>
-            <div className="flex flex-wrap gap-3">
-              {unassignedPlayers.map(playerId => {
-                const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 8)}`;
-                const isCurrentUser = playerId === user?.uid;
-                const isPlayerHost = playerId === lobby.createdBy;
-
-                return (
-                  <div
-                    key={playerId}
-                    className="flex items-center gap-2"
-                  >
-                    <span className="text-sm">
-                      {isCurrentUser ? 'You' : playerUsername}
-                    </span>
-                    {isPlayerHost && <Crown className="h-3 w-3" />}
+        <main className="flex-1 overflow-y-auto px-16 py-8">
+          <div className="container mx-auto">
+            {/* Warning if in another active game */}
+            {isInActiveGameElsewhere && !isInThisLobby && (
+              <div className="mb-6 border border-red-500 p-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500" />
+                  <div className="flex-1">
+                    <p className="font-medium text-red-500">You're in an active game</p>
+                    <p className="text-sm text-gray-500">Finish your current game before joining this lobby.</p>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        {lobby.status === 'waiting' && isInThisLobby && (
-          <div className="bg-white p-6">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {isHost && (
-                <>
                   <button
-                    onClick={handleRandomizeTeams}
-                    className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors"
+                    onClick={() => navigate(`/game/${userCurrentLobby?.id}`)}
+                    className="px-4 py-2 bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
                   >
-                    <Shuffle className="h-4 w-4" />
-                    Randomize
+                    Return to Game
                   </button>
-                  <button
-                    onClick={handleStartLobby}
-                    disabled={!teamsEven || lobby.players.length < 2}
-                    className={cn(
-                      "flex items-center gap-2 px-6 py-3 font-medium transition-all",
-                      teamsEven && lobby.players.length >= 2
-                        ? "bg-green-500 hover:bg-green-600 text-white"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    <Play className="h-4 w-4" />
-                    Start Game
-                  </button>
-                </>
-              )}
-              <button
-                onClick={handleLeaveLobby}
-                className="flex items-center gap-2 px-5 py-3 border border-red-500 text-red-500 font-medium transition-colors hover:bg-red-500 hover:text-white"
-              >
-                <LogOut className="h-4 w-4" />
-                Leave
-              </button>
-            </div>
-            {isHost && !teamsEven && (
-              <p className="text-center text-sm text-gray-400 mt-4 flex items-center justify-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Teams must be even to start
-              </p>
+                </div>
+              </div>
             )}
-          </div>
-        )}
 
-        {/* Game in progress */}
-        {lobby.status === 'playing' && lobby.onGoingGame && (
-          <div className="bg-white p-8 text-center">
-            <h2 className="text-2xl font-semibold mb-2">Game in Progress</h2>
-            <p className="text-gray-500 mb-6">This lobby has an active game.</p>
-            <button
-              onClick={() => navigate(`/game/${gameId}`)}
-              className="px-8 py-3 bg-black text-white font-medium hover:opacity-90 transition-opacity"
-            >
-              {isInThisLobby ? 'Go to Game' : 'Spectate Game'}
-            </button>
-          </div>
-        )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Center: Teams (spans 2 columns) */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Lobby Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+                  <div>
+                    <h1 className="text-2xl font-semibold">{lobby.name}</h1>
+                    <div className="flex items-center gap-4 mt-2 text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <Users className="h-4 w-4" />
+                        {lobby.players.length}/{lobby.maxPlayers} players
+                      </span>
+                      {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
+                        <span>
+                          Series: <span className="text-red-500 font-medium">{historicalScores[0]}</span>
+                          <span className="mx-1">-</span>
+                          <span className="text-blue-500 font-medium">{historicalScores[1]}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleCopyInviteLink}
+                      className="flex items-center gap-2 underline transition-all"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? 'Copied!' : 'Invite Link'}
+                    </button>
+                    <div className={cn(
+                      "px-3 py-1 text-sm font-normal",
+                      lobby.status === 'waiting'
+                        ? "bg-purple-500 text-white"
+                        : "bg-amber-500 text-white"
+                    )}>
+                      {lobby.status === 'waiting' ? 'Waiting for players' : 'In Progress'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Teams */}
+                {lobby.status === 'waiting' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Red Team */}
+                    <div className="p-6 border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-medium text-red-500">Red Team</h2>
+                        <span className="text-sm">{team0Players.length}</span>
+                      </div>
+                      <div className="space-y-2 min-h-[120px]">
+                        {team0Players.length === 0 ? (
+                          <p className="text-gray-400 text-center py-8">No players yet</p>
+                        ) : (
+                          team0Players.map(playerId => (
+                            <PlayerRow key={playerId} playerId={playerId} team={0} showSwap />
+                          ))
+                        )}
+                      </div>
+                      {user && userTeam !== 0 && isInThisLobby && (
+                        <button
+                          onClick={() => handleJoinTeam(0)}
+                          className="w-full mt-4 py-3 bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+                        >
+                          Join Red Team
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Blue Team */}
+                    <div className="p-6 border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-medium text-blue-500">Blue Team</h2>
+                        <span className="text-sm">{team1Players.length}</span>
+                      </div>
+                      <div className="space-y-2 min-h-[120px]">
+                        {team1Players.length === 0 ? (
+                          <p className="text-gray-400 text-center py-8">No players yet</p>
+                        ) : (
+                          team1Players.map(playerId => (
+                            <PlayerRow key={playerId} playerId={playerId} team={1} showSwap />
+                          ))
+                        )}
+                      </div>
+                      {user && userTeam !== 1 && isInThisLobby && (
+                        <button
+                          onClick={() => handleJoinTeam(1)}
+                          className="w-full mt-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors"
+                        >
+                          Join Blue Team
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Unassigned Players */}
+                {lobby.status === 'waiting' && unassignedPlayers.length > 0 && (
+                  <div className="p-4 border border-gray-200">
+                    <h3 className="text-sm mb-2">Unassigned Players</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {unassignedPlayers.map(playerId => {
+                        const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 8)}`;
+                        const isCurrentUser = playerId === user?.uid;
+                        const isPlayerHost = playerId === lobby.createdBy;
+
+                        return (
+                          <div key={playerId} className="flex items-center gap-2">
+                            <span className="text-sm">{isCurrentUser ? 'You' : playerUsername}</span>
+                            {isPlayerHost && <Crown className="h-3 w-3" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Game in progress */}
+                {lobby.status === 'playing' && lobby.onGoingGame && (
+                  <div className="p-8 text-center border border-gray-200">
+                    <h2 className="text-2xl font-semibold mb-2">Game in Progress</h2>
+                    <p className="text-gray-500">This lobby has an active game.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Options */}
+              <div>
+                <div className="border border-gray-200 p-6 space-y-4">
+                  <h3 className="font-medium text-lg">Options</h3>
+
+                  {lobby.status === 'waiting' && isInThisLobby && (
+                    <>
+                      {isHost && (
+                        <>
+                          <button
+                            onClick={handleStartLobby}
+                            disabled={!teamsEven || lobby.players.length < 2}
+                            className={cn(
+                              "w-full flex items-center justify-center gap-2 py-3 font-medium transition-all",
+                              teamsEven && lobby.players.length >= 2
+                                ? "bg-purple-500 hover:bg-purple-600 text-white"
+                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            )}
+                          >
+                            <Play className="h-4 w-4" />
+                            Start Game
+                          </button>
+
+                          {!teamsEven && (
+                            <p className="text-sm text-gray-400 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4" />
+                              Teams must be even to start
+                            </p>
+                          )}
+
+                          <button
+                            onClick={handleRandomizeTeams}
+                            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors"
+                          >
+                            <Shuffle className="h-4 w-4" />
+                            Randomize Teams
+                          </button>
+                        </>
+                      )}
+
+                      <hr className="border-gray-200" />
+
+                      <button
+                        onClick={handleLeaveLobby}
+                        className="w-full flex items-center justify-center gap-2 py-3 border border-red-500 text-red-500 font-medium transition-colors hover:bg-red-500 hover:text-white"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Leave Lobby
+                      </button>
+                    </>
+                  )}
+
+                  {lobby.status === 'playing' && isInThisLobby && (
+                    <button
+                      onClick={() => navigate(`/game/${gameId}`)}
+                      className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+                    >
+                      Return to game
+                    </button>
+                  )}
+
+                  {lobby.status === 'playing' && !isInThisLobby && (
+                    <button
+                      onClick={() => navigate(`/game/${gameId}`)}
+                      className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors"
+                    >
+                      Spectate game
+                    </button>
+                  )}
+
+                  {!isInThisLobby && lobby.status === 'waiting' && (
+                    <p className="text-sm text-gray-500 text-center">
+                      {userCurrentLobby?.status === 'playing'
+                        ? 'You must leave your current game before joining another'
+                        : userCurrentLobby
+                          ? 'You must leave your current lobby before joining another'
+                          : 'You are spectating this lobby'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>

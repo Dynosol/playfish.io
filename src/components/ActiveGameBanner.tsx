@@ -66,7 +66,7 @@ const ActiveGameBanner: React.FC = () => {
         <style>{shimmerKeyframes}</style>
         <div
           onClick={() => navigate(`/game/${currentLobby.id}`)}
-          className="relative overflow-hidden bg-lime-800 text-white py-2 px-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-lime-700 transition-colors"
+          className="relative overflow-hidden bg-green-700 text-white py-2 px-4 flex items-center justify-center gap-2 cursor-pointer hover:bg-green-800 transition-colors"
         >
           <div
             className="absolute inset-0 pointer-events-none"

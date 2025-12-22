@@ -53,7 +53,7 @@ export const subscribeToMessages = (
 
   return onSnapshot(messagesQuery, (snapshot) => {
     const messages = snapshot.docs.map(doc => {
-      const data = doc.data();
+      const data = doc.data({ serverTimestamps: 'estimate' });
       const timestamp = data.timestamp instanceof Timestamp
         ? data.timestamp.toDate()
         : data.timestamp?.toDate?.() ?? new Date();

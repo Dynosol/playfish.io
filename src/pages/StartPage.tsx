@@ -177,11 +177,17 @@ const StartPage: React.FC = () => {
                       {lobbies.map(lobby => {
                         const isFull = (lobby.players?.length || 0) >= (lobby.maxPlayers || 4);
                         const isInThisLobby = user && lobby.players?.includes(user.uid);
+                        const isInAnotherLobby = currentLobby && !isInThisLobby;
                         const isInActiveGame = currentLobby?.status === 'playing';
-                        const canJoin = !isFull && lobby.status === 'waiting' && !isInThisLobby && !isInActiveGame;
+                        const canJoin = !isFull && lobby.status === 'waiting' && !isInThisLobby && !isInAnotherLobby;
+                        const blockedReason = isInActiveGame
+                          ? 'You must leave your current game before joining another'
+                          : isInAnotherLobby
+                            ? 'You must leave your current lobby before joining another'
+                            : null;
 
                         return (
-                          <TableRow key={lobby.id} className="h-8">
+                          <TableRow key={lobby.id} className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
                             <TableCell className="py-1 font-medium">{lobby.name}</TableCell>
                             <TableCell className="py-1">{hostUsernames.get(lobby.createdBy) || '...'}</TableCell>
                             <TableCell className="py-1">
@@ -189,7 +195,7 @@ const StartPage: React.FC = () => {
                             </TableCell>
                             <TableCell className="py-1">
                               <Badge className={lobby.status === 'waiting' ? 'bg-purple-500 text-white hover:bg-purple-500 font-normal' : 'font-normal'} variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
-                                {lobby.status === 'waiting' ? 'Waiting for players' : 'In Progress'}
+                                {lobby.status === 'waiting' ? (isFull ? 'Waiting to start' : 'Waiting for players') : 'In Progress'}
                               </Badge>
                             </TableCell>
                             <TableCell className="py-1 text-right">
@@ -209,9 +215,19 @@ const StartPage: React.FC = () => {
                                 >
                                   {joining === lobby.id ? 'Joining...' : 'Join'}
                                 </button>
+                              ) : blockedReason ? (
+                                <span
+                                  className="text-gray-400 underline cursor-not-allowed relative group"
+                                  title={blockedReason}
+                                >
+                                  Join
+                                  <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    {blockedReason}
+                                  </span>
+                                </span>
                               ) : (
                                 <button
-                                  className="text-xs underline hover:opacity-70"
+                                  className="underline hover:opacity-70"
                                   onClick={() => handleSpectate(lobby.id, lobby.status)}
                                 >
                                   Spectate
@@ -242,7 +258,7 @@ const StartPage: React.FC = () => {
                       <input
                         id="lobbyName"
                         type="text"
-                        className={`w-40 px-2 py-1 border rounded text-sm ${lobbyNameError ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-40 px-2 py-1 border rounded text-sm outline-none ${lobbyNameError ? 'border-red-500' : 'border-gray-300 focus:border-gray-400'}`}
                         placeholder="Enter name"
                         value={lobbyName}
                         onChange={(e) => {
