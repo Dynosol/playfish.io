@@ -112,30 +112,6 @@ const StartPage: React.FC = () => {
       <Header type="home" />
 
       <main className="flex-1 container mx-auto px-4 py-8">
-        {/* Current Game Banner */}
-        {currentLobby && (
-          <Card className="mb-8 bg-primary/5 border-primary/20">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                Active Session
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  {currentLobby.status === 'playing' 
-                    ? "You are currently in an active game."
-                    : "You are currently in a lobby."}
-                </p>
-                <p className="font-medium">{currentLobby.name}</p>
-              </div>
-              <Button onClick={() => navigate(currentLobby.status === 'playing' ? `/game/${currentLobby.id}` : `/lobby/${currentLobby.id}`)}>
-                Return to {currentLobby.status === 'playing' ? 'Game' : 'Lobby'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Center: Lobby List */}
           <div className="lg:col-span-2 space-y-6">
@@ -186,7 +162,7 @@ const StartPage: React.FC = () => {
                               {isInThisLobby ? (
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
                                   onClick={() => handleSpectate(lobby.id, lobby.status)}
                                 >
                                   Return
