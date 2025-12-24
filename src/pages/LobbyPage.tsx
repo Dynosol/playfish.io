@@ -10,7 +10,6 @@ import { getUserColorHex } from '../utils/userColors';
 import { colors } from '../utils/colors';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
-import { cn } from '@/lib/utils';
 
 const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -209,7 +208,7 @@ const LobbyPage: React.FC = () => {
   const isInThisLobby = user && lobby.players.includes(user.uid);
   const historicalScores = lobby.historicalScores || { 0: 0, 1: 0 };
 
-  const PlayerRow = ({ playerId, team, showSwap = false, index }: { playerId: string; team: 0 | 1; showSwap?: boolean; index: number }) => {
+  const PlayerRow = ({ playerId, showSwap = false, index }: { playerId: string; showSwap?: boolean; index: number }) => {
     const isCurrentUser = playerId === user?.uid;
     const isPlayerHost = playerId === lobby.createdBy;
 
@@ -309,7 +308,7 @@ const LobbyPage: React.FC = () => {
                           {Array.from({ length: lobby.maxPlayers / 2 }).map((_, index) => {
                             const playerId = team0Players[index];
                             return playerId ? (
-                              <PlayerRow key={playerId} playerId={playerId} team={0} showSwap index={index} />
+                              <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-0-${index}`} className="border-b border-gray-100 last:border-b-0">
                                 <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
@@ -347,7 +346,7 @@ const LobbyPage: React.FC = () => {
                           {Array.from({ length: lobby.maxPlayers / 2 }).map((_, index) => {
                             const playerId = team1Players[index];
                             return playerId ? (
-                              <PlayerRow key={playerId} playerId={playerId} team={1} showSwap index={index} />
+                              <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-1-${index}`} className="border-b border-gray-100 last:border-b-0">
                                 <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
