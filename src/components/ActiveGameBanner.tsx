@@ -67,9 +67,17 @@ const ActiveGameBanner: React.FC = () => {
     return unsubscribe;
   }, [currentLobby?.onGoingGame]);
 
-  // Handle countdown when user has left
+  // Check if user has left the game
+  const hasUserLeft = currentGame?.leftPlayer?.odId === user?.uid;
+
+  // Calculate countdown synchronously to avoid timing issues
+  const calculatedCountdown = hasUserLeft && currentGame?.leftPlayer
+    ? Math.max(0, LEAVE_TIMEOUT_SECONDS - Math.floor((Date.now() - currentGame.leftPlayer.odAt) / 1000))
+    : null;
+
+  // Handle countdown timer updates
   useEffect(() => {
-    if (!currentGame?.leftPlayer || !user || currentGame.leftPlayer.odId !== user.uid) {
+    if (!hasUserLeft || !currentGame?.leftPlayer) {
       setLeaveCountdown(null);
       return;
     }
@@ -84,7 +92,7 @@ const ActiveGameBanner: React.FC = () => {
     const interval = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(interval);
-  }, [currentGame?.leftPlayer, user]);
+  }, [hasUserLeft, currentGame?.leftPlayer]);
 
   const handleReturnToGame = async () => {
     if (!currentGame || !user || isReturning) return;
@@ -113,11 +121,11 @@ const ActiveGameBanner: React.FC = () => {
   const isOnGamePage = location.pathname === `/game/${currentLobby.id}`;
   const isOnLobbyPage = location.pathname === `/lobby/${currentLobby.id}`;
 
-  // Check if user has left the game
-  const hasUserLeft = currentGame?.leftPlayer?.odId === user?.uid;
+  // Use calculated countdown as fallback when effect hasn't run yet
+  const displayCountdown = leaveCountdown ?? calculatedCountdown;
 
   // Show red warning banner if user has left the game (highest priority)
-  if (isPlaying && hasUserLeft && leaveCountdown !== null) {
+  if (isPlaying && hasUserLeft && displayCountdown !== null) {
     return (
       <>
         <style>{shimmerKeyframes}</style>
@@ -134,8 +142,7 @@ const ActiveGameBanner: React.FC = () => {
             }}
           />
           <span className="relative z-10">
-            You have <strong>{leaveCountdown} seconds</strong> to return to{' '}
-            <strong>{currentLobby.name}</strong> or the game will end! Click{' '}
+            You have left <strong>{currentLobby.name}</strong>. <strong>{displayCountdown} seconds</strong> to return or the game will end! Click{' '}
             <span className="underline">here</span> to return
           </span>
           <ArrowRight className="h-4 w-4 relative z-10" />
@@ -144,8 +151,8 @@ const ActiveGameBanner: React.FC = () => {
     );
   }
 
-  // Show green banner for active game (if not on game page)
-  if (isPlaying && !isOnGamePage) {
+  // Show green banner for active game (if not on game page and user hasn't left)
+  if (isPlaying && !isOnGamePage && !hasUserLeft) {
     return (
       <>
         <style>{shimmerKeyframes}</style>

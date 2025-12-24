@@ -6,7 +6,9 @@ import {
   serverTimestamp,
   getDoc,
   updateDoc,
-  runTransaction
+  runTransaction,
+  setDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -46,7 +48,9 @@ export interface LeftPlayer {
 
 export interface Game {
   id: string;
-  gameId: string;
+  uuid: string; // Unique game identifier (persists in historical collections)
+  lobbyUuid: string; // Reference to the lobby's UUID
+  gameId: string; // Lobby ID (word-based, can be reused)
   players: string[];
   teams: { [playerId: string]: 0 | 1 };
   playerHands: { [playerId: string]: Card[] };
@@ -62,6 +66,35 @@ export interface Game {
   leftPlayer: LeftPlayer | null;
   createdAt: Date;
 }
+
+// Archive a completed game to the completedGames collection
+const archiveCompletedGame = async (gameDocId: string, gameData: Game): Promise<void> => {
+  const archivedGameRef = doc(db, 'completedGames', gameDocId);
+  await setDoc(archivedGameRef, {
+    ...gameData,
+    archivedAt: serverTimestamp()
+  });
+  await deleteDoc(doc(db, 'games', gameDocId));
+};
+
+// Export for use from lobbyService
+export const archiveCompletedGameFromLobby = async (gameDocId: string): Promise<void> => {
+  const game = await getGame(gameDocId);
+  if (game) {
+    await archiveCompletedGame(gameDocId, game);
+  }
+};
+
+// Archive an unfinished game (forfeit, abandoned) to the unfinishedGames collection
+const archiveUnfinishedGame = async (gameDocId: string, gameData: Game, reason: 'forfeit' | 'abandoned'): Promise<void> => {
+  const archivedGameRef = doc(db, 'unfinishedGames', gameDocId);
+  await setDoc(archivedGameRef, {
+    ...gameData,
+    archivedAt: serverTimestamp(),
+    endReason: reason
+  });
+  await deleteDoc(doc(db, 'games', gameDocId));
+};
 
 const suits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
 const ranks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
@@ -149,7 +182,12 @@ const assignTeams = (players: string[], teamAssignments: { [playerId: string]: 0
   return teams;
 };
 
-export const createGame = async (gameId: string, players: string[], teamAssignments: { [playerId: string]: 0 | 1 }): Promise<string> => {
+export const createGame = async (
+  gameId: string,
+  players: string[],
+  teamAssignments: { [playerId: string]: 0 | 1 },
+  lobbyUuid: string
+): Promise<string> => {
   const playerHands = distributeCards(players);
   const teams = assignTeams(players, teamAssignments);
 
@@ -157,7 +195,12 @@ export const createGame = async (gameId: string, players: string[], teamAssignme
   const randomIndex = Math.floor(Math.random() * players.length);
   const firstPlayer = players[randomIndex];
 
+  // Generate a unique game UUID
+  const uuid = crypto.randomUUID();
+
   const gameData = {
+    uuid,
+    lobbyUuid,
     gameId,
     players,
     teams,
@@ -458,13 +501,16 @@ export const voteForReplay = async (
       const teamAssignments: { [pid: string]: 0 | 1 } = {};
       result.game.players.forEach(pid => { teamAssignments[pid] = result.game.teams[pid]; });
 
-      const newGameDocId = await createGame(result.game.gameId, result.game.players, teamAssignments);
+      const newGameDocId = await createGame(result.game.gameId, result.game.players, teamAssignments, result.game.lobbyUuid);
 
       await updateDoc(result.lobbyRef, {
         status: 'playing',
         onGoingGame: newGameDocId,
         historicalScores: result.historicalScores
       });
+
+      // Archive the old completed game
+      await archiveCompletedGame(result.game.id, result.game);
 
       return { success: true, shouldReplay: true };
     }
@@ -567,12 +613,19 @@ export const forfeitGame = async (
       const leftPlayerTeam = game.teams[game.leftPlayer.odId];
       const winningTeam = leftPlayerTeam === 0 ? 1 : 0;
 
+      // Create the updated game data for archiving
+      const updatedGame: Game = {
+        ...game,
+        gameOver: { winner: winningTeam },
+        leftPlayer: null
+      };
+
       transaction.update(gameRef, {
         gameOver: { winner: winningTeam },
         leftPlayer: null
       });
 
-      return { success: true, gameId: game.gameId, winningTeam } as const;
+      return { success: true, gameId: game.gameId, winningTeam, game: updatedGame } as const;
     });
 
     if (!result.success) return result;
@@ -586,6 +639,9 @@ export const forfeitGame = async (
       updatedScores[result.winningTeam]++;
       await updateDoc(lobbyRef, { historicalScores: updatedScores });
     }
+
+    // Archive the forfeited game to unfinishedGames
+    await archiveUnfinishedGame(gameDocId, result.game, 'forfeit');
 
     return { success: true };
   } catch (error) {

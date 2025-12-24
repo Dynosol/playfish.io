@@ -14,7 +14,6 @@ interface ChatBoxProps {
 const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [sending, setSending] = useState(false);
   const { user } = useAuth();
   const username = useUsername(user?.uid);
 
@@ -72,20 +71,19 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !user || sending) return;
+    const message = inputMessage.trim();
+    if (!message || !user) return;
 
-    setSending(true);
-    try {
-      const userName = username || `User ${user.uid.slice(0, 16)}`;
-      await sendMessage(chatId, user.uid, userName, inputMessage);
-      setInputMessage('');
-    } catch (error) {
+    // Clear immediately for instant feedback
+    setInputMessage('');
+
+    // Send in background
+    const userName = username || `User ${user.uid.slice(0, 16)}`;
+    sendMessage(chatId, user.uid, userName, message).catch((error) => {
       console.error('Failed to send message:', error);
-    } finally {
-      setSending(false);
-    }
+    });
   };
 
   return (
@@ -96,7 +94,14 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 flex flex-col">
-        <div ref={messagesContainerRef} className="h-64 overflow-y-auto p-3">
+        <div
+          ref={messagesContainerRef}
+          className="h-64 overflow-y-auto p-3"
+          onMouseDown={(e) => {
+            // Prevent clicks on messages area from stealing focus from input
+            e.preventDefault();
+          }}
+        >
           <div className="space-y-2">
             {messages.length === 0 ? (
               <div className="text-center text-xs text-muted-foreground mt-4">
@@ -145,7 +150,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Type a message..."
-              disabled={sending || !user}
+              disabled={!user}
               className="w-full h-8 px-3 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-400"
             />
           </form>

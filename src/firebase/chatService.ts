@@ -51,22 +51,26 @@ export const subscribeToMessages = (
     limit(messageLimit)
   );
 
-  return onSnapshot(messagesQuery, (snapshot) => {
-    const messages = snapshot.docs.map(doc => {
-      const data = doc.data({ serverTimestamps: 'estimate' });
-      const timestamp = data.timestamp instanceof Timestamp
-        ? data.timestamp.toDate()
-        : data.timestamp?.toDate?.() ?? new Date();
+  return onSnapshot(
+    messagesQuery,
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      const messages = snapshot.docs.map(doc => {
+        const data = doc.data({ serverTimestamps: 'estimate' });
+        const timestamp = data.timestamp instanceof Timestamp
+          ? data.timestamp.toDate()
+          : data.timestamp?.toDate?.() ?? new Date();
 
-      return {
-        id: doc.id,
-        userId: data.userId,
-        userName: data.userName || `User ${data.userId?.slice(0, 16) ?? 'Unknown'}`,
-        message: data.message,
-        timestamp
-      } as ChatMessage;
-    });
+        return {
+          id: doc.id,
+          userId: data.userId,
+          userName: data.userName || `User ${data.userId?.slice(0, 16) ?? 'Unknown'}`,
+          message: data.message,
+          timestamp
+        } as ChatMessage;
+      });
 
-    callback(messages);
-  });
+      callback(messages);
+    }
+  );
 };

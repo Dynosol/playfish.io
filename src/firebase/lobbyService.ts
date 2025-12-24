@@ -15,11 +15,12 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { updateUserCurrentLobby } from './userService';
-import { createGame } from './gameService';
+import { createGame, archiveCompletedGameFromLobby } from './gameService';
 import { generateLobbyId } from '../utils/lobbyIdGenerator';
 
 export interface Lobby {
   id: string;
+  uuid: string; // Permanent unique identifier (persists in historical collections)
   name: string;
   players: string[];
   teams: { [playerId: string]: 0 | 1 | null };
@@ -45,15 +46,23 @@ export const subscribeToActiveLobbies = (
     where('status', 'in', ['waiting', 'playing'])
   );
 
-  return onSnapshot(lobbiesQuery, (snapshot) => {
-    console.log('Received lobbies snapshot:', snapshot.docs.length, 'lobbies');
-    const lobbiesList = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Lobby));
-    console.log('Lobbies list:', lobbiesList);
-    callback(lobbiesList);
-  });
+  return onSnapshot(
+    lobbiesQuery,
+    (snapshot) => {
+      console.log('Received lobbies snapshot:', snapshot.docs.length, 'lobbies');
+      const lobbiesList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Lobby));
+      console.log('Lobbies list:', lobbiesList);
+      callback(lobbiesList);
+    },
+    (error) => {
+      console.error('Error subscribing to lobbies:', error);
+      // Still call callback with empty array so loading state clears
+      callback([]);
+    }
+  );
 };
 
 export const subscribeToLobby = (
@@ -149,9 +158,13 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
     throw new Error('Failed to generate unique lobby ID');
   }
 
+  // Generate a permanent UUID that persists in historical collections
+  const uuid = crypto.randomUUID();
+
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   await setDoc(lobbyRef, {
     ...lobbyData,
+    uuid,
     players: [lobbyData.createdBy],
     teams: { [lobbyData.createdBy]: null },
     status: 'waiting',
@@ -322,22 +335,22 @@ export const randomizeTeams = async (lobbyId: string, _playerId: string): Promis
 const startGameFromLobby = async (lobbyId: string): Promise<void> => {
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   const lobbySnap = await getDoc(lobbyRef);
-  
+
   if (!lobbySnap.exists()) throw new Error('Lobby not found');
-  
+
   const lobbyData = lobbySnap.data() as Lobby;
-  
+
   if (!areTeamsEven(lobbyData)) throw new Error('Teams must be even to start the game');
-  
+
   const teamAssignments: { [playerId: string]: 0 | 1 } = {};
   for (const playerId of lobbyData.players) {
     const team = lobbyData.teams[playerId];
     if (team === null) throw new Error('All players must be assigned to a team');
     teamAssignments[playerId] = team;
   }
-  
-  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments);
-  
+
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid);
+
   await updateDoc(lobbyRef, {
     status: 'playing',
     onGoingGame: gameDocId,
@@ -349,13 +362,23 @@ export const startLobby = startGameFromLobby;
 
 export const returnToLobby = async (lobbyId: string): Promise<void> => {
   const lobbyRef = doc(db, 'lobbies', lobbyId);
-  
-  await runTransaction(db, async (transaction) => {
+
+  const gameDocId = await runTransaction(db, async (transaction) => {
     const lobbySnap = await transaction.get(lobbyRef);
     if (!lobbySnap.exists()) throw new Error('Lobby not found');
-    
+
+    const lobbyData = lobbySnap.data() as Lobby;
+    const onGoingGame = lobbyData.onGoingGame;
+
     transaction.update(lobbyRef, { status: 'waiting', onGoingGame: null });
+
+    return onGoingGame;
   });
+
+  // Archive the completed game if one exists
+  if (gameDocId) {
+    await archiveCompletedGameFromLobby(gameDocId);
+  }
 };
 
 export const replayGame = startGameFromLobby;

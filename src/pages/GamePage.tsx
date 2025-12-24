@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { colors } from '../utils/colors';
 
 const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -60,6 +61,7 @@ const GamePage: React.FC = () => {
   const [sortMethod, setSortMethod] = useState<'rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc'>('suit_rank_asc');
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [leaveCountdown, setLeaveCountdown] = useState<number | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const [dragState, setDragState] = useState<{
     index: number;
@@ -1091,7 +1093,7 @@ const GamePage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button
-                onClick={handleLeaveGame}
+                onClick={() => setShowLeaveConfirm(true)}
                 variant="outline"
                 size="sm"
                 className="w-full justify-start"
@@ -1160,6 +1162,34 @@ const GamePage: React.FC = () => {
           </UICard>
         </div>
       </div>
+
+      {/* Leave Confirmation Modal */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full mx-4">
+            <h2 className="text-lg font-semibold mb-2">Leave Game?</h2>
+            <p className="text-sm text-gray-500 mb-4">Are you sure you want to leave this game? Your team will forfeit if no one returns within {LEAVE_TIMEOUT_SECONDS} seconds.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  handleLeaveGame();
+                }}
+                className="flex-1 py-2 text-sm font-medium text-white rounded hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: colors.red }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

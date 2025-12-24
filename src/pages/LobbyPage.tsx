@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Crown, Users, ArrowLeftRight, Shuffle, Play, LogOut, Copy, Check, AlertCircle } from 'lucide-react';
+import { Crown, ArrowLeftRight, Shuffle, Play, LogOut, Copy, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { subscribeToUser, type UserDocument } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
+import { colors } from '../utils/colors';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ const LobbyPage: React.FC = () => {
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
   const [userCurrentLobby, setUserCurrentLobby] = useState<Lobby | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const isLeavingRef = useRef(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -172,7 +174,7 @@ const LobbyPage: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-gray-500">Loading lobby...</div>
+        <div className="text-sm text-gray-500">Loading lobby...</div>
       </div>
     );
   }
@@ -182,12 +184,12 @@ const LobbyPage: React.FC = () => {
       <div className="min-h-screen bg-white flex flex-col">
         <Header type="home" />
         <main className="flex-1 flex items-center justify-center px-4">
-          <div className="bg-white border border-gray-200 p-8 max-w-md w-full text-center">
-            <h1 className="text-2xl font-semibold mb-2">Lobby not found</h1>
-            <p className="text-gray-500 mb-6">This lobby may have been deleted or doesn't exist.</p>
+          <div className="bg-white border border-gray-200 p-6 max-w-md w-full text-center">
+            <h1 className="text-base font-semibold mb-1">Lobby not found</h1>
+            <p className="text-sm text-gray-500 mb-4">This lobby may have been deleted or doesn't exist.</p>
             <button
               onClick={() => navigate('/')}
-              className="w-full py-3 px-4 bg-black text-white font-medium hover:opacity-90 transition-opacity"
+              className="w-full py-2 px-4 text-sm bg-black text-white font-medium hover:opacity-90 transition-opacity"
             >
               Back to Home
             </button>
@@ -207,37 +209,32 @@ const LobbyPage: React.FC = () => {
   const isInThisLobby = user && lobby.players.includes(user.uid);
   const historicalScores = lobby.historicalScores || { 0: 0, 1: 0 };
 
-  const PlayerRow = ({ playerId, team, showSwap = false }: { playerId: string; team: 0 | 1; showSwap?: boolean }) => {
+  const PlayerRow = ({ playerId, team, showSwap = false, index }: { playerId: string; team: 0 | 1; showSwap?: boolean; index: number }) => {
     const isCurrentUser = playerId === user?.uid;
     const isPlayerHost = playerId === lobby.createdBy;
 
     return (
-      <div className="flex items-center justify-between py-2 px-4">
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            "h-8 w-8 flex items-center justify-center text-white text-sm",
-            team === 0 ? "bg-red-500" : "bg-blue-500"
-          )}>
-            {getUsername(playerId).charAt(0).toUpperCase()}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold" style={{ color: getUserColor(playerId) }}>
+      <tr>
+        <td className="py-1 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+        <td className="py-1" colSpan={2}>
+          <div className="inline-flex items-center bg-white px-3 py-1.5 rounded shadow-sm">
+            <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
               {isCurrentUser ? 'You' : getUsername(playerId)}
             </span>
             {isPlayerHost && (
-              <Crown className="h-4 w-4 text-amber-500" />
+              <Crown className="h-3.5 w-3.5 text-yellow-400 ml-1.5" />
+            )}
+            {showSwap && isHost && !isCurrentUser && (
+              <button
+                onClick={() => handleSwapTeam(playerId)}
+                className="p-1 hover:bg-gray-100 transition-colors ml-1.5 rounded"
+              >
+                <ArrowLeftRight className="h-4 w-4 text-gray-500" />
+              </button>
             )}
           </div>
-        </div>
-        {showSwap && isHost && !isCurrentUser && (
-          <button
-            onClick={() => handleSwapTeam(playerId)}
-            className="p-2 hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeftRight className="h-4 w-4 text-gray-400" />
-          </button>
-        )}
-      </div>
+        </td>
+      </tr>
     );
   };
 
@@ -259,16 +256,17 @@ const LobbyPage: React.FC = () => {
           <div className="container mx-auto">
             {/* Warning if in another active game */}
             {isInActiveGameElsewhere && !isInThisLobby && (
-              <div className="mb-3 border border-red-500 p-3">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-500" />
+              <div className="mb-3 border p-2" style={{ borderColor: colors.red }}>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" style={{ color: colors.red }} />
                   <div className="flex-1">
-                    <p className="font-medium text-red-500">You're in an active game</p>
-                    <p className="text-sm text-gray-500">Finish your current game before joining this lobby.</p>
+                    <p className="text-sm font-medium" style={{ color: colors.red }}>You're in an active game</p>
+                    <p className="text-xs text-gray-500">Finish your current game before joining this lobby.</p>
                   </div>
                   <button
                     onClick={() => navigate(`/game/${userCurrentLobby?.id}`)}
-                    className="px-4 py-2 bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+                    className="px-3 py-1.5 text-sm text-white font-medium transition-colors hover:opacity-90"
+                    style={{ backgroundColor: colors.red }}
                   >
                     Return to Game
                   </button>
@@ -276,68 +274,56 @@ const LobbyPage: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              {/* Center: Teams (spans 2 columns) */}
-              <div className="lg:col-span-2 space-y-3">
-                {/* Lobby Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
-                  <div>
-                    <h1 className="text-2xl font-semibold">{lobby.name}</h1>
-                    <div className="flex items-center gap-4 mt-2 text-gray-500">
-                      <span className="flex items-center gap-1.5">
-                        <Users className="h-4 w-4" />
-                        {lobby.players.length}/{lobby.maxPlayers} players
-                      </span>
-                      {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
-                        <span>
-                          Series: <span className="text-red-500 font-medium">{historicalScores[0]}</span>
-                          <span className="mx-1">-</span>
-                          <span className="text-blue-500 font-medium">{historicalScores[1]}</span>
-                        </span>
-                      )}
+            <div className="space-y-3">
+              {/* Teams and Options */}
+              <div className="space-y-3">
+                {/* Lobby Header - Centered */}
+                <div className="text-center pb-3 border-b border-gray-200 bg-white p-4 rounded shadow">
+                  <h1 className="text-2xl font-semibold">{lobby.name}</h1>
+                  {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
+                    <div className="mt-2 inline-block bg-white px-4 py-2 rounded shadow-sm text-base">
+                      Score: <span className="font-medium" style={{ color: colors.red }}>{historicalScores[0]}</span>
+                      <span className="mx-1">-</span>
+                      <span className="font-medium" style={{ color: colors.blue }}>{historicalScores[1]}</span>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleCopyInviteLink}
-                      className="flex items-center gap-2 underline transition-all"
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      {copied ? 'Copied!' : 'Invite Link'}
-                    </button>
-                    <div className={cn(
-                      "px-3 py-1 text-sm font-normal",
-                      lobby.status === 'waiting'
-                        ? "bg-purple-500 text-white"
-                        : "bg-amber-500 text-white"
-                    )}>
-                      {lobby.status === 'waiting' ? 'Waiting for players' : 'In Progress'}
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Teams */}
                 {lobby.status === 'waiting' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="p-3 border border-gray-200">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-medium text-red-500">Red Team</h2>
-                        <span className="text-sm">{team0Players.length}</span>
-                      </div>
-                      <div className="space-y-2 min-h-[120px]">
-                        {team0Players.length === 0 ? (
-                          <p className="text-gray-400 text-center py-8">No players yet</p>
-                        ) : (
-                          team0Players.map(playerId => (
-                            <PlayerRow key={playerId} playerId={playerId} team={0} showSwap />
-                          ))
-                        )}
-                      </div>
+                    <div className="bg-white p-3 rounded shadow">
+                      <table className="w-full">
+                        <thead>
+                          <tr style={{ borderBottom: `2px solid ${colors.red}` }}>
+                            <th className="py-2 text-left text-sm font-semibold" style={{ color: colors.red }} colSpan={2}>
+                              Red Team
+                            </th>
+                            <th className="py-2 text-right">
+                              <span style={{ backgroundColor: colors.red, color: 'white', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>{team0Players.length}/{lobby.maxPlayers / 2}</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: lobby.maxPlayers / 2 }).map((_, index) => {
+                            const playerId = team0Players[index];
+                            return playerId ? (
+                              <PlayerRow key={playerId} playerId={playerId} team={0} showSwap index={index} />
+                            ) : (
+                              <tr key={`empty-0-${index}`} className="border-b border-gray-100 last:border-b-0">
+                                <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+                                <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                       {user && userTeam !== 0 && isInThisLobby && (
                         <button
                           onClick={() => handleJoinTeam(0)}
-                          className="w-full mt-4 py-3 bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+                          className="w-full mt-2 py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
+                          style={{ backgroundColor: colors.red }}
                         >
                           Join Red Team
                         </button>
@@ -345,24 +331,37 @@ const LobbyPage: React.FC = () => {
                     </div>
 
                     {/* Blue Team */}
-                    <div className="p-3 border border-gray-200">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-medium text-blue-500">Blue Team</h2>
-                        <span className="text-sm">{team1Players.length}</span>
-                      </div>
-                      <div className="space-y-2 min-h-[120px]">
-                        {team1Players.length === 0 ? (
-                          <p className="text-gray-400 text-center py-8">No players yet</p>
-                        ) : (
-                          team1Players.map(playerId => (
-                            <PlayerRow key={playerId} playerId={playerId} team={1} showSwap />
-                          ))
-                        )}
-                      </div>
+                    <div className="bg-white p-3 rounded shadow">
+                      <table className="w-full">
+                        <thead>
+                          <tr style={{ borderBottom: `2px solid ${colors.blue}` }}>
+                            <th className="py-2 text-left text-sm font-semibold" style={{ color: colors.blue }} colSpan={2}>
+                              Blue Team
+                            </th>
+                            <th className="py-2 text-right">
+                              <span style={{ backgroundColor: colors.blue, color: 'white', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>{team1Players.length}/{lobby.maxPlayers / 2}</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: lobby.maxPlayers / 2 }).map((_, index) => {
+                            const playerId = team1Players[index];
+                            return playerId ? (
+                              <PlayerRow key={playerId} playerId={playerId} team={1} showSwap index={index} />
+                            ) : (
+                              <tr key={`empty-1-${index}`} className="border-b border-gray-100 last:border-b-0">
+                                <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+                                <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                       {user && userTeam !== 1 && isInThisLobby && (
                         <button
                           onClick={() => handleJoinTeam(1)}
-                          className="w-full mt-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors"
+                          className="w-full mt-2 py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
+                          style={{ backgroundColor: colors.blue }}
                         >
                           Join Blue Team
                         </button>
@@ -373,19 +372,19 @@ const LobbyPage: React.FC = () => {
 
                 {/* Unassigned Players */}
                 {lobby.status === 'waiting' && unassignedPlayers.length > 0 && (
-                  <div className="p-4 border border-gray-200">
-                    <h3 className="text-sm mb-2">Unassigned Players</h3>
-                    <div className="flex flex-wrap gap-3">
+                  <div className="p-2 border border-gray-200">
+                    <h3 className="text-xs text-gray-500 mb-1.5">Unassigned Players</h3>
+                    <div className="flex flex-wrap gap-2">
                       {unassignedPlayers.map(playerId => {
                         const isCurrentUser = playerId === user?.uid;
                         const isPlayerHost = playerId === lobby.createdBy;
 
                         return (
-                          <div key={playerId} className="flex items-center gap-2">
+                          <div key={playerId} className="flex items-center gap-1">
                             <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
                               {isCurrentUser ? 'You' : getUsername(playerId)}
                             </span>
-                            {isPlayerHost && <Crown className="h-3 w-3" />}
+                            {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}
                           </div>
                         );
                       })}
@@ -395,69 +394,101 @@ const LobbyPage: React.FC = () => {
 
                 {/* Game in progress */}
                 {lobby.status === 'playing' && lobby.onGoingGame && (
-                  <div className="p-8 text-center border border-gray-200">
-                    <h2 className="text-2xl font-semibold mb-2">Game in Progress</h2>
-                    <p className="text-gray-500">This lobby has an active game.</p>
+                  <div className="p-6 text-center border border-gray-200">
+                    <h2 className="text-base font-semibold mb-1">Game in Progress</h2>
+                    <p className="text-sm text-gray-500">This lobby has an active game.</p>
                   </div>
                 )}
-              </div>
 
-              {/* Right: Options */}
-              <div>
-                <div className="border border-gray-200 p-3 space-y-3">
-                  <h3 className="font-medium text-lg">Options</h3>
+                {/* Options */}
+                <div className="bg-white p-3 rounded shadow space-y-2">
+                  {/* Status Info */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
+                    <div
+                      className="px-3 py-1 text-xs font-normal rounded-full text-white"
+                      style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : '#f59e0b' }}
+                    >
+                      {lobby.status === 'waiting' ? 'Waiting for more players' : 'In Progress'}
+                    </div>
+                  </div>
 
-                  {lobby.status === 'waiting' && isInThisLobby && (
+                  {lobby.status === 'waiting' && isInThisLobby && isHost && (
                     <>
-                      {isHost && (
-                        <>
-                          <button
-                            onClick={handleStartLobby}
-                            disabled={!teamsEven || lobby.players.length < 2}
-                            className={cn(
-                              "w-full flex items-center justify-center gap-2 py-3 font-medium transition-all",
-                              teamsEven && lobby.players.length >= 2
-                                ? "bg-purple-500 hover:bg-purple-600 text-white"
-                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            )}
-                          >
-                            <Play className="h-4 w-4" />
-                            Start Game
-                          </button>
+                      <button
+                        onClick={handleStartLobby}
+                        disabled={!teamsEven || lobby.players.length < 2}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium transition-all rounded"
+                        style={{
+                          backgroundColor: teamsEven && lobby.players.length >= 2 ? colors.purple : '#e5e7eb',
+                          color: teamsEven && lobby.players.length >= 2 ? 'white' : '#9ca3af',
+                          cursor: teamsEven && lobby.players.length >= 2 ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        <Play className="h-3.5 w-3.5" />
+                        Start Game
+                      </button>
 
-                          {!teamsEven && (
-                            <p className="text-sm text-gray-400 flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4" />
-                              Teams must be even to start
-                            </p>
-                          )}
-
-                          <button
-                            onClick={handleRandomizeTeams}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition-colors"
-                          >
-                            <Shuffle className="h-4 w-4" />
-                            Randomize Teams
-                          </button>
-                        </>
+                      {!teamsEven && (
+                        <p className="text-xs flex items-center gap-1.5" style={{ color: colors.red }}>
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          Teams must be even to start
+                        </p>
                       )}
 
-                      <hr className="border-gray-200" />
+                      <div className="flex gap-4">
+                        <button
+                          onClick={handleCopyInviteLink}
+                          className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity"
+                        >
+                          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                          {copied ? 'Copied!' : 'Copy Invite Link'}
+                        </button>
+                        <button
+                          onClick={handleRandomizeTeams}
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          style={{ color: colors.blue }}
+                        >
+                          <Shuffle className="h-3.5 w-3.5" />
+                          Randomize Teams
+                        </button>
+                        <button
+                          onClick={() => setShowLeaveConfirm(true)}
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          style={{ color: colors.red }}
+                        >
+                          <LogOut className="h-3.5 w-3.5" />
+                          Leave Lobby
+                        </button>
+                      </div>
+                    </>
+                  )}
 
+                  {lobby.status === 'waiting' && isInThisLobby && !isHost && (
+                    <div className="flex gap-4">
                       <button
-                        onClick={handleLeaveLobby}
-                        className="w-full flex items-center justify-center gap-2 py-3 border border-red-500 text-red-500 font-medium transition-colors hover:bg-red-500 hover:text-white"
+                        onClick={handleCopyInviteLink}
+                        className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity"
                       >
-                        <LogOut className="h-4 w-4" />
+                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copied ? 'Copied!' : 'Copy Invite Link'}
+                      </button>
+                      <button
+                        onClick={() => setShowLeaveConfirm(true)}
+                        className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                        style={{ color: colors.red }}
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
                         Leave Lobby
                       </button>
-                    </>
+                    </div>
                   )}
 
                   {lobby.status === 'playing' && isInThisLobby && (
                     <button
                       onClick={() => navigate(`/game/${gameId}`)}
-                      className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+                      className="w-full py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
+                      style={{ backgroundColor: colors.green }}
                     >
                       Return to game
                     </button>
@@ -466,14 +497,15 @@ const LobbyPage: React.FC = () => {
                   {lobby.status === 'playing' && !isInThisLobby && (
                     <button
                       onClick={() => navigate(`/game/${gameId}`)}
-                      className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium transition-colors"
+                      style={{ backgroundColor: colors.purple, color: 'white' }}
+                      className="w-full py-2 text-sm font-medium transition-colors rounded hover:opacity-90"
                     >
                       Spectate game
                     </button>
                   )}
 
                   {!isInThisLobby && lobby.status === 'waiting' && (
-                    <p className="text-sm text-gray-500 text-center">
+                    <p className="text-xs text-gray-500 text-center">
                       {userCurrentLobby?.status === 'playing'
                         ? 'You must leave your current game before joining another'
                         : userCurrentLobby
@@ -487,6 +519,34 @@ const LobbyPage: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Leave Confirmation Modal */}
+      {showLeaveConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full mx-4">
+            <h2 className="text-lg font-semibold mb-2">Leave Lobby?</h2>
+            <p className="text-sm text-gray-500 mb-4">Are you sure you want to leave this lobby?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLeaveConfirm(false);
+                  handleLeaveLobby();
+                }}
+                className="flex-1 py-2 text-sm font-medium text-white rounded hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: colors.red }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

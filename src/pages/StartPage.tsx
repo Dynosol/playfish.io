@@ -5,9 +5,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
+import { colors } from '../utils/colors';
 import { subscribeToLobby, subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
+import { subscribeToGame, returnToGame } from '../firebase/gameService';
 import type { UserDocument } from '../firebase/userService';
 import type { Lobby } from '../firebase/lobbyService';
+import type { Game } from '../firebase/gameService';
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
@@ -20,9 +23,11 @@ const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
   const [currentLobby, setCurrentLobby] = useState<Lobby | null>(null);
+  const [currentGame, setCurrentGame] = useState<Game | null>(null);
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loadingLobbies, setLoadingLobbies] = useState(true);
   const [joining, setJoining] = useState<string | null>(null);
+  const [isReturning, setIsReturning] = useState(false);
   const [lobbyName, setLobbyName] = useState('');
   const [lobbyNameError, setLobbyNameError] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<string>("4");
@@ -59,13 +64,34 @@ const StartPage: React.FC = () => {
     return unsubscribe;
   }, [userDoc?.currentLobbyId]);
 
+  // Subscribe to current game to check if user has left
   useEffect(() => {
-    const unsubscribe = subscribeToActiveLobbies((lobbiesList) => {
-      setLobbies(lobbiesList);
-      setLoadingLobbies(false);
+    if (!currentLobby?.onGoingGame) {
+      setCurrentGame(null);
+      return;
+    }
+
+    const unsubscribe = subscribeToGame(currentLobby.onGoingGame, (game) => {
+      setCurrentGame(game);
     });
 
     return unsubscribe;
+  }, [currentLobby?.onGoingGame]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const unsubscribe = subscribeToActiveLobbies((lobbiesList) => {
+      if (mounted) {
+        setLobbies(lobbiesList);
+        setLoadingLobbies(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const sanitizeLobbyName = (name: string): string => {
@@ -137,6 +163,28 @@ const StartPage: React.FC = () => {
     }
   };
 
+  // Handle returning to game when user has left (clears leftPlayer and navigates)
+  const handleReturnToGame = async (lobbyId: string) => {
+    if (!currentGame || !user || isReturning) return;
+
+    setIsReturning(true);
+    try {
+      const result = await returnToGame(currentGame.id, user.uid);
+      if (result.success) {
+        navigate(`/game/${lobbyId}`);
+      } else {
+        console.error('Failed to return to game:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to return to game:', error);
+    } finally {
+      setIsReturning(false);
+    }
+  };
+
+  // Check if user has left their current game
+  const hasUserLeftGame = currentGame?.leftPlayer?.odId === user?.uid;
+
   if (authLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
@@ -200,19 +248,34 @@ const StartPage: React.FC = () => {
                               {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                             </TableCell>
                             <TableCell className="py-1">
-                              <Badge className={lobby.status === 'waiting' ? 'bg-purple-500 text-white hover:bg-purple-500 font-normal' : 'font-normal'} variant={lobby.status === 'waiting' ? 'default' : 'secondary'}>
+                              <Badge
+                                className="font-normal text-white"
+                                style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : undefined }}
+                                variant={lobby.status === 'waiting' ? 'default' : 'secondary'}
+                              >
                                 {lobby.status === 'waiting' ? (isFull ? 'Waiting to start' : 'Waiting for players') : 'In Progress'}
                               </Badge>
                             </TableCell>
                             <TableCell className="py-1 text-right">
                               {isInThisLobby ? (
-                                <Button
-                                  size="sm"
-                                  className="h-6 w-20 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
-                                  onClick={() => handleSpectate(lobby.id, lobby.status)}
-                                >
-                                  Return
-                                </Button>
+                                hasUserLeftGame && lobby.status === 'playing' ? (
+                                  <Button
+                                    size="sm"
+                                    className="h-6 w-20 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                                    onClick={() => handleReturnToGame(lobby.id)}
+                                    disabled={isReturning}
+                                  >
+                                    {isReturning ? '...' : 'Return'}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    className="h-6 w-20 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
+                                    onClick={() => handleSpectate(lobby.id, lobby.status)}
+                                  >
+                                    Return
+                                  </Button>
+                                )
                               ) : canJoin ? (
                                 <button
                                   className="underline hover:opacity-70 disabled:opacity-50"
@@ -296,7 +359,8 @@ const StartPage: React.FC = () => {
                 </CardContent>
                 <CardFooter>
                   <Button
-                    className={currentLobby ? "w-full rounded bg-gray-400 hover:bg-gray-400 text-white cursor-not-allowed" : "w-full rounded bg-purple-500 hover:bg-purple-500/90 text-white"}
+                    className="w-full rounded text-white"
+                    style={{ backgroundColor: currentLobby ? '#9ca3af' : colors.purple }}
                     type="submit"
                     disabled={creating || !!currentLobby}
                   >
