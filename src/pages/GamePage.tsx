@@ -17,6 +17,9 @@ import {
   startDeclaration,
   finishDeclaration,
   voteForReplay,
+  leaveGame,
+  forfeitGame,
+  LEAVE_TIMEOUT_SECONDS,
   type Card
 } from '../firebase/gameService';
 import { subscribeToLobby, returnToLobby, replayGame } from '../firebase/lobbyService';
@@ -24,7 +27,8 @@ import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
 import cardBack from '../assets/cards/card_back.svg';
 import ChatBox from '../components/ChatBox';
-import { useUsernames } from '../hooks/useUsername';
+import { useUsers } from '../hooks/useUsername';
+import { getUserColorHex } from '../utils/userColors';
 import CardImage from '../components/CardImage';
 import { getCardImageSrc } from '../utils/cardUtils';
 import { Button } from "@/components/ui/button";
@@ -55,6 +59,7 @@ const GamePage: React.FC = () => {
   const [localPlayerHand, setLocalPlayerHand] = useState<Card[]>([]);
   const [sortMethod, setSortMethod] = useState<'rank_asc' | 'rank_desc' | 'suit_rank_asc' | 'suit_rank_desc'>('suit_rank_asc');
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [leaveCountdown, setLeaveCountdown] = useState<number | null>(null);
 
   const [dragState, setDragState] = useState<{
     index: number;
@@ -244,8 +249,36 @@ const GamePage: React.FC = () => {
     }
   }, [game]);
 
+  // Handle countdown timer when a player has left
+  useEffect(() => {
+    if (!game?.leftPlayer || game.gameOver) {
+      setLeaveCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const elapsed = Date.now() - game.leftPlayer!.odAt;
+      const remaining = Math.max(0, LEAVE_TIMEOUT_SECONDS - Math.floor(elapsed / 1000));
+      setLeaveCountdown(remaining);
+
+      // Auto-forfeit when countdown reaches 0
+      if (remaining === 0 && lobby?.onGoingGame) {
+        forfeitGame(lobby.onGoingGame);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [game?.leftPlayer, game?.gameOver, lobby?.onGoingGame]);
+
   const playersArray = useMemo(() => game?.players || [], [game?.players]);
-  const usernames = useUsernames(playersArray);
+  const usersData = useUsers(playersArray);
+
+  // Helper to get styled username
+  const getUsername = (playerId: string) => usersData.get(playerId)?.username || `Player ${playerId.slice(0, 8)}`;
+  const getUserColor = (playerId: string) => getUserColorHex(usersData.get(playerId)?.color || 'slate');
 
   const isPlayer = (!!user && game?.players?.includes(user.uid)) || false;
   const isMyTurn = (!!user && isPlayer && game && game.currentTurn === user.uid) || false;
@@ -511,6 +544,20 @@ const GamePage: React.FC = () => {
     }
   };
 
+  const handleLeaveGame = async () => {
+    if (!game || !user || !isPlayer) return;
+    try {
+      const result = await leaveGame(game.id, user.uid);
+      if (result.success) {
+        navigate('/');
+      } else {
+        console.error('Failed to leave game:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to leave game:', error);
+    }
+  };
+
   const getOpponentPosition = (index: number, total: number) => {
     if (total === 0) return { left: '50%', top: '50%' };
     if (total === 1) {
@@ -590,11 +637,11 @@ const GamePage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Chat */}
-        <div className="pl-16 py-4 shrink-0">
-          <ChatBox chatId={gameId!} className="border border-gray-200" />
+        <div className="w-72 shrink-0 p-3">
+          <ChatBox chatId={gameId!} className="border border-gray-200 h-full" />
         </div>
 
-        {/* Game Area */}
+        {/* Center - Game Area */}
         <div className="flex-1 relative">
 
       {/* Scores (Center Table) */}
@@ -617,7 +664,21 @@ const GamePage: React.FC = () => {
       {/* Status Announcement (Top Center) */}
       <div className="absolute top-4 left-0 right-0 z-30 px-4 flex justify-center pointer-events-none">
         <div className="pointer-events-auto max-w-md">
-          {!isInDeclarePhase ? (
+          {game.leftPlayer ? (
+            <div className="bg-red-50 border border-red-300 px-4 py-2">
+              <div className="text-sm text-center">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-red-600">Game Paused</span>
+                  <span className="text-xs text-red-500">
+                    <span className="font-semibold" style={{ color: getUserColor(game.leftPlayer.odId) }}>{getUsername(game.leftPlayer.odId)}</span> has left the game.
+                    {leaveCountdown !== null && (
+                      <span className="font-semibold"> {leaveCountdown}s</span>
+                    )} to return or the game ends.
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : !isInDeclarePhase ? (
             <div className="bg-white border border-gray-200 px-4 py-2">
               <div className="text-sm text-center">
                 {isMyTurn ? (
@@ -626,8 +687,8 @@ const GamePage: React.FC = () => {
                     <span className="text-xs text-muted-foreground">Press on the player you wish to ask.</span>
                   </div>
                 ) : (
-                  <div className="font-medium">
-                    Waiting for {usernames.get(game.currentTurn) || 'player'}...
+                  <div>
+                    Waiting for <span className="font-semibold" style={{ color: getUserColor(game.currentTurn) }}>{getUsername(game.currentTurn)}</span>...
                   </div>
                 )}
               </div>
@@ -638,8 +699,8 @@ const GamePage: React.FC = () => {
                 {isDeclaree ? (
                   <span className="font-semibold text-amber-600">You are declaring!</span>
                 ) : (
-                  <span className="font-medium">
-                    {usernames.get(game.declarePhase?.declareeId || '') || 'A player'} has started declaring...
+                  <span>
+                    <span className="font-semibold" style={{ color: getUserColor(game.declarePhase?.declareeId || '') }}>{getUsername(game.declarePhase?.declareeId || '')}</span> has started declaring...
                   </span>
                 )}
               </div>
@@ -660,12 +721,15 @@ const GamePage: React.FC = () => {
               <div>
                 <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
                 <ul className="text-sm space-y-1">
-                  {getTeamPlayers(game, winningTeam as 0 | 1).map(playerId => {
-                    const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                    return (
-                      <li key={playerId}>{playerId === user?.uid ? 'You' : playerUsername}</li>
-                    );
-                  })}
+                  {getTeamPlayers(game, winningTeam as 0 | 1).map(playerId => (
+                    <li key={playerId}>
+                      {playerId === user?.uid ? (
+                        <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
+                      ) : (
+                        <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               </div>
               <div className="flex gap-2">
@@ -690,7 +754,6 @@ const GamePage: React.FC = () => {
           {allOtherPlayers.map((playerId, index) => {
             const position = getOpponentPosition(index, allOtherPlayers.length);
             const isCurrentTurn = game.currentTurn === playerId;
-            const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
             const handSize = game.playerHands[playerId]?.length || 0;
             const isOpponent = opponents.includes(playerId);
             const isClickable = isMyTurn && !isInDeclarePhase && isOpponent;
@@ -713,7 +776,7 @@ const GamePage: React.FC = () => {
                 </div>
                 <div className="mt-2 text-center space-y-1">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="text-sm font-semibold">{playerUsername}</div>
+                    <div className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</div>
                     <Badge className={cn(
                       "text-xs px-1 py-0 h-5 text-white border-none",
                       game.teams[playerId] === 0 ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"
@@ -789,14 +852,13 @@ const GamePage: React.FC = () => {
                                   <SelectValue placeholder="Select..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {teamPlayers.map(playerId => {
-                                    const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 16)}`;
-                                    return (
-                                      <SelectItem key={playerId} value={playerId} className="text-xs">
-                                        {playerId === user?.uid ? 'You' : playerUsername}
-                                      </SelectItem>
-                                    );
-                                  })}
+                                  {teamPlayers.map(playerId => (
+                                    <SelectItem key={playerId} value={playerId} className="text-xs">
+                                      <span className="font-semibold" style={{ color: getUserColor(playerId) }}>
+                                        {playerId === user?.uid ? 'You' : getUsername(playerId)}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1019,6 +1081,83 @@ const GamePage: React.FC = () => {
            />
         </div>
       )}
+        </div>
+
+        {/* Right Sidebar - Options */}
+        <div className="w-56 shrink-0 p-3 flex flex-col gap-3">
+          <UICard>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Game Options</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                onClick={handleLeaveGame}
+                variant="outline"
+                size="sm"
+                className="w-full justify-start"
+                disabled={!!game.leftPlayer || isGameOver}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Leave Game
+              </Button>
+              {isHost && (
+                <Button
+                  onClick={handleReturnToLobby}
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                >
+                  Return All to Lobby
+                </Button>
+              )}
+            </CardContent>
+          </UICard>
+
+          <UICard>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Game Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Room:</span>
+                <span className="font-medium">{lobby.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Players:</span>
+                <span className="font-medium">{game.players.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Your Team:</span>
+                {user && game.teams[user.uid] !== undefined && (
+                  <Badge className={cn(
+                    "text-xs text-white border-none",
+                    game.teams[user.uid] === 0 ? "bg-red-500" : "bg-blue-500"
+                  )}>
+                    {game.teams[user.uid] === 0 ? 'Red' : 'Blue'}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </UICard>
+
+          <UICard>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Completed Halfsuits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {game.completedHalfsuits.length === 0 ? (
+                <p className="text-xs text-muted-foreground">None yet</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {game.completedHalfsuits.map(hs => (
+                    <Badge key={hs} variant="secondary" className="text-xs">
+                      {hs}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </UICard>
         </div>
       </div>
     </div>

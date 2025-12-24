@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { subscribeToUser, type UserDocument } from '../firebase/userService';
-import { useUsernames } from '../hooks/useUsername';
+import { useUsers } from '../hooks/useUsername';
+import { getUserColorHex } from '../utils/userColors';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
 import { cn } from '@/lib/utils';
@@ -162,7 +163,11 @@ const LobbyPage: React.FC = () => {
     return lobby.players.filter(playerId => lobby.teams[playerId] === null);
   };
 
-  const usernames = useUsernames(lobby?.players || []);
+  const usersData = useUsers(lobby?.players || []);
+
+  // Helper to get styled username
+  const getUsername = (playerId: string) => usersData.get(playerId)?.username || `Player ${playerId.slice(0, 8)}`;
+  const getUserColor = (playerId: string) => getUserColorHex(usersData.get(playerId)?.color || 'slate');
 
   if (loading) {
     return (
@@ -203,7 +208,6 @@ const LobbyPage: React.FC = () => {
   const historicalScores = lobby.historicalScores || { 0: 0, 1: 0 };
 
   const PlayerRow = ({ playerId, team, showSwap = false }: { playerId: string; team: 0 | 1; showSwap?: boolean }) => {
-    const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 8)}`;
     const isCurrentUser = playerId === user?.uid;
     const isPlayerHost = playerId === lobby.createdBy;
 
@@ -214,11 +218,11 @@ const LobbyPage: React.FC = () => {
             "h-8 w-8 flex items-center justify-center text-white text-sm",
             team === 0 ? "bg-red-500" : "bg-blue-500"
           )}>
-            {playerUsername.charAt(0).toUpperCase()}
+            {getUsername(playerId).charAt(0).toUpperCase()}
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn("font-medium", isCurrentUser && "text-green-600")}>
-              {isCurrentUser ? 'You' : playerUsername}
+            <span className="font-semibold" style={{ color: getUserColor(playerId) }}>
+              {isCurrentUser ? 'You' : getUsername(playerId)}
             </span>
             {isPlayerHost && (
               <Crown className="h-4 w-4 text-amber-500" />
@@ -243,7 +247,7 @@ const LobbyPage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Chat */}
-        <div className="pl-16 py-8 shrink-0">
+        <div className="p-3 shrink-0">
           {gameId && isInThisLobby ? (
             <ChatBox chatId={gameId} className="border border-gray-200" />
           ) : (
@@ -251,11 +255,11 @@ const LobbyPage: React.FC = () => {
           )}
         </div>
 
-        <main className="flex-1 overflow-y-auto px-16 py-8">
+        <main className="flex-1 overflow-y-auto p-3">
           <div className="container mx-auto">
             {/* Warning if in another active game */}
             {isInActiveGameElsewhere && !isInThisLobby && (
-              <div className="mb-6 border border-red-500 p-4">
+              <div className="mb-3 border border-red-500 p-3">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   <div className="flex-1">
@@ -272,9 +276,9 @@ const LobbyPage: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {/* Center: Teams (spans 2 columns) */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-2 space-y-3">
                 {/* Lobby Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200">
                   <div>
@@ -314,9 +318,9 @@ const LobbyPage: React.FC = () => {
 
                 {/* Teams */}
                 {lobby.status === 'waiting' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="p-6 border border-gray-200">
+                    <div className="p-3 border border-gray-200">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-medium text-red-500">Red Team</h2>
                         <span className="text-sm">{team0Players.length}</span>
@@ -341,7 +345,7 @@ const LobbyPage: React.FC = () => {
                     </div>
 
                     {/* Blue Team */}
-                    <div className="p-6 border border-gray-200">
+                    <div className="p-3 border border-gray-200">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-medium text-blue-500">Blue Team</h2>
                         <span className="text-sm">{team1Players.length}</span>
@@ -373,13 +377,14 @@ const LobbyPage: React.FC = () => {
                     <h3 className="text-sm mb-2">Unassigned Players</h3>
                     <div className="flex flex-wrap gap-3">
                       {unassignedPlayers.map(playerId => {
-                        const playerUsername = usernames.get(playerId) || `Player ${playerId.slice(0, 8)}`;
                         const isCurrentUser = playerId === user?.uid;
                         const isPlayerHost = playerId === lobby.createdBy;
 
                         return (
                           <div key={playerId} className="flex items-center gap-2">
-                            <span className="text-sm">{isCurrentUser ? 'You' : playerUsername}</span>
+                            <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
+                              {isCurrentUser ? 'You' : getUsername(playerId)}
+                            </span>
                             {isPlayerHost && <Crown className="h-3 w-3" />}
                           </div>
                         );
@@ -399,7 +404,7 @@ const LobbyPage: React.FC = () => {
 
               {/* Right: Options */}
               <div>
-                <div className="border border-gray-200 p-6 space-y-4">
+                <div className="border border-gray-200 p-3 space-y-3">
                   <h3 className="font-medium text-lg">Options</h3>
 
                   {lobby.status === 'waiting' && isInThisLobby && (

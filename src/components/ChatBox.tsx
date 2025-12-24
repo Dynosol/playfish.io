@@ -118,7 +118,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
                   >
                     {showName && (
                       <span
-                        className="text-xs mb-0.5"
+                        className="text-xs mb-0.5 font-semibold"
                         style={{ color: getUserColorHex(usersData.get(msg.userId)?.color || 'slate') }}
                       >
                         {isCurrentUser ? 'You' : msg.userName}

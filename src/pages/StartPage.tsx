@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser } from '../firebase/userService';
-import { useUsernames } from '../hooks/useUsername';
+import { useUsers } from '../hooks/useUsername';
+import { getUserColorHex } from '../utils/userColors';
 import { subscribeToLobby, subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
 import type { UserDocument } from '../firebase/userService';
 import type { Lobby } from '../firebase/lobbyService';
@@ -29,7 +30,11 @@ const StartPage: React.FC = () => {
   const navigate = useNavigate();
 
   const hostUids = useMemo(() => lobbies.map(l => l.createdBy).filter(Boolean), [lobbies]);
-  const hostUsernames = useUsernames(hostUids);
+  const hostUsersData = useUsers(hostUids);
+
+  // Helper to get styled username for hosts
+  const getHostUsername = (hostId: string) => hostUsersData.get(hostId)?.username || '...';
+  const getHostColor = (hostId: string) => getUserColorHex(hostUsersData.get(hostId)?.color || 'slate');
 
   useEffect(() => {
     if (!user) return;
@@ -142,15 +147,15 @@ const StartPage: React.FC = () => {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Global Chat */}
-        <div className="pl-16 py-8 shrink-0">
+        <div className="p-3 shrink-0">
           <ChatBox chatId="global" className="border border-gray-200" />
         </div>
 
-        <main className="flex-1 overflow-y-auto px-16 py-8">
+        <main className="flex-1 overflow-y-auto p-3">
           <div className="container mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           {/* Center: Lobby List */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-3">
             <Card>
               <CardContent className="p-0">
                 {loadingLobbies ? (
@@ -186,7 +191,11 @@ const StartPage: React.FC = () => {
                         return (
                           <TableRow key={lobby.id} className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
                             <TableCell className="py-1 font-medium">{lobby.name}</TableCell>
-                            <TableCell className="py-1">{hostUsernames.get(lobby.createdBy) || '...'}</TableCell>
+                            <TableCell className="py-1">
+                              <span className="font-semibold" style={{ color: getHostColor(lobby.createdBy) }}>
+                                {getHostUsername(lobby.createdBy)}
+                              </span>
+                            </TableCell>
                             <TableCell className="py-1">
                               {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                             </TableCell>

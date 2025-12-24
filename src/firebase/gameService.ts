@@ -39,6 +39,11 @@ export interface DeclarePhase {
   declareeId: string | null;
 }
 
+export interface LeftPlayer {
+  odId: string;
+  odAt: number; // timestamp when player left
+}
+
 export interface Game {
   id: string;
   gameId: string;
@@ -54,6 +59,7 @@ export interface Game {
   declarePhase: DeclarePhase | null;
   gameOver: { winner: 0 | 1 | null } | null;
   replayVotes: string[];
+  leftPlayer: LeftPlayer | null;
   createdAt: Date;
 }
 
@@ -165,6 +171,7 @@ export const createGame = async (gameId: string, players: string[], teamAssignme
     declarePhase: null,
     gameOver: null,
     replayVotes: [],
+    leftPlayer: null,
     createdAt: serverTimestamp()
   };
 
@@ -252,6 +259,7 @@ export const askForCard = async (
       const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
       if (game.declarePhase?.active) return { success: false, error: 'Game is paused during declaration phase' };
+      if (game.leftPlayer) return { success: false, error: 'Game is paused - a player has left' };
       if (game.currentTurn !== askerId) return { success: false, error: 'It is not your turn' };
 
       const opponents = getOpponents(game, askerId);
@@ -302,6 +310,7 @@ export const startDeclaration = async (
       const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
 
       if (game.declarePhase?.active) return { success: false, error: 'A declaration is already in progress' };
+      if (game.leftPlayer) return { success: false, error: 'Game is paused - a player has left' };
       if (!isPlayerAlive(game, declareeId)) return { success: false, error: 'You must have cards to declare' };
 
       transaction.update(gameRef, { declarePhase: { active: true, declareeId } });
@@ -463,6 +472,124 @@ export const voteForReplay = async (
     return { success: true, shouldReplay: false };
   } catch (error) {
     console.error('Error in voteForReplay:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const LEAVE_TIMEOUT_SECONDS = 60;
+
+export const leaveGame = async (
+  gameDocId: string,
+  playerId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+
+    return await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
+
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' };
+
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+      if (!game.players.includes(playerId)) return { success: false, error: 'You are not in this game' };
+      if (game.gameOver) return { success: false, error: 'Game is already over' };
+      if (game.leftPlayer) return { success: false, error: 'A player has already left' };
+
+      transaction.update(gameRef, {
+        leftPlayer: {
+          odId: playerId,
+          odAt: Date.now()
+        }
+      });
+
+      return { success: true };
+    });
+  } catch (error) {
+    console.error('Error in leaveGame:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const returnToGame = async (
+  gameDocId: string,
+  playerId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+
+    return await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
+
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' };
+
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+      if (!game.leftPlayer) return { success: false, error: 'No player has left' };
+      if (game.leftPlayer.odId !== playerId) return { success: false, error: 'You are not the player who left' };
+      if (game.gameOver) return { success: false, error: 'Game is already over' };
+
+      // Check if timeout has expired
+      const elapsed = Date.now() - game.leftPlayer.odAt;
+      if (elapsed >= LEAVE_TIMEOUT_SECONDS * 1000) {
+        return { success: false, error: 'Return timeout has expired' };
+      }
+
+      transaction.update(gameRef, {
+        leftPlayer: null
+      });
+
+      return { success: true };
+    });
+  } catch (error) {
+    console.error('Error in returnToGame:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const forfeitGame = async (
+  gameDocId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const gameRef = doc(db, 'games', gameDocId);
+
+    const result = await runTransaction(db, async (transaction) => {
+      const gameSnap = await transaction.get(gameRef);
+
+      if (!gameSnap.exists()) return { success: false, error: 'Game not found' } as const;
+
+      const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+      if (game.gameOver) return { success: false, error: 'Game is already over' } as const;
+      if (!game.leftPlayer) return { success: false, error: 'No player has left' } as const;
+
+      // The team of the player who left loses
+      const leftPlayerTeam = game.teams[game.leftPlayer.odId];
+      const winningTeam = leftPlayerTeam === 0 ? 1 : 0;
+
+      transaction.update(gameRef, {
+        gameOver: { winner: winningTeam },
+        leftPlayer: null
+      });
+
+      return { success: true, gameId: game.gameId, winningTeam } as const;
+    });
+
+    if (!result.success) return result;
+
+    // Update lobby historical scores
+    const lobbyRef = doc(db, 'lobbies', result.gameId);
+    const lobbySnap = await getDoc(lobbyRef);
+    if (lobbySnap.exists()) {
+      const current = lobbySnap.data()?.historicalScores || { 0: 0, 1: 0 };
+      const updatedScores = { ...current };
+      updatedScores[result.winningTeam]++;
+      await updateDoc(lobbyRef, { historicalScores: updatedScores });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error in forfeitGame:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

@@ -10,11 +10,11 @@ const RulesPage: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header type="home" />
 
-      <main className="flex-1 overflow-y-auto px-4 py-8">
+      <main className="flex-1 overflow-y-auto p-3">
         <div className="container mx-auto max-w-3xl">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-3"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
