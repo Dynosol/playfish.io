@@ -79,20 +79,22 @@ const StartPage: React.FC = () => {
   }, [currentLobby?.onGoingGame]);
 
   useEffect(() => {
-    let mounted = true;
+    if (!user) {
+      setLobbies([]);
+      setLoadingLobbies(false);
+      return;
+    }
 
+    setLoadingLobbies(true);
     const unsubscribe = subscribeToActiveLobbies((lobbiesList) => {
-      if (mounted) {
-        setLobbies(lobbiesList);
-        setLoadingLobbies(false);
-      }
+      setLobbies(lobbiesList);
+      setLoadingLobbies(false);
     });
 
     return () => {
-      mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const sanitizeLobbyName = (name: string): string => {
     // Trim whitespace and collapse multiple spaces

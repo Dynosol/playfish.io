@@ -13,6 +13,7 @@ import { subscribeToUser, updateUsername } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
 import { cn } from "@/lib/utils";
 import playfishLogo from '@/assets/playfish.png';
+import fishIcon from '@/assets/favicon.png';
 import { getUserColorHex } from '../utils/userColors';
 
 interface HeaderProps {
@@ -84,10 +85,11 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between relative">
           {/* Left: Logo */}
           <div
-            className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+            className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={handleHomeClick}
           >
-            <img src={playfishLogo} alt="playfish.io" className="h-8" />
+            <img src={fishIcon} alt="Fish" className="h-8 w-8" />
+            <img src={playfishLogo} alt="playfish.io" className="h-10" />
           </div>
 
           {/* Center: Dynamic Content */}

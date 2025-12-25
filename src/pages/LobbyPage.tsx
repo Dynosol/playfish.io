@@ -214,7 +214,7 @@ const LobbyPage: React.FC = () => {
 
     return (
       <tr>
-        <td className="py-1 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+        <td className="py-1 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
         <td className="py-1" colSpan={2}>
           <div className="inline-flex items-center bg-white px-3 py-1.5 rounded shadow-sm">
             <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
@@ -292,7 +292,7 @@ const LobbyPage: React.FC = () => {
                 {lobby.status === 'waiting' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="bg-white p-3 rounded shadow">
+                    <div className="bg-gray-50 p-3 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.red}` }}>
@@ -311,7 +311,7 @@ const LobbyPage: React.FC = () => {
                               <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-0-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+                                <td className="py-2 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
                                 <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
                               </tr>
                             );
@@ -330,7 +330,7 @@ const LobbyPage: React.FC = () => {
                     </div>
 
                     {/* Blue Team */}
-                    <div className="bg-white p-3 rounded shadow">
+                    <div className="bg-gray-50 p-3 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.blue}` }}>
@@ -349,7 +349,7 @@ const LobbyPage: React.FC = () => {
                               <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-1-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-sm text-gray-400 w-6">{index + 1}</td>
+                                <td className="py-2 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
                                 <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
                               </tr>
                             );
