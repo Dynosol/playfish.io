@@ -1,16 +1,15 @@
 import {
   collection,
-  addDoc,
   query,
   orderBy,
   limit,
   where,
   onSnapshot,
-  serverTimestamp,
   Timestamp,
   QueryConstraint
 } from 'firebase/firestore';
 import { db } from './config';
+import { callSendMessage } from './functionsClient';
 
 export const GLOBAL_CHAT_ID = 'global';
 
@@ -28,17 +27,12 @@ const getMessagesRef = (chatId: string) => {
 
 export const sendMessage = async (
   chatId: string,
-  userId: string,
-  userName: string,
+  _userId: string,
+  _userName: string,
   message: string
 ): Promise<void> => {
-  const messagesRef = getMessagesRef(chatId);
-  await addDoc(messagesRef, {
-    userId,
-    userName,
-    message: message.trim(),
-    timestamp: serverTimestamp()
-  });
+  // userId and userName are now derived server-side from auth
+  await callSendMessage({ chatId, message });
 };
 
 export const subscribeToMessages = (

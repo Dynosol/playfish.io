@@ -1,9 +1,7 @@
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
+import {
+  doc,
+  getDoc,
   onSnapshot,
-  serverTimestamp,
   collection,
   query,
   where,
@@ -12,8 +10,13 @@ import {
   documentId
 } from 'firebase/firestore';
 import { db } from './config';
-import { generateUsername } from '../utils/usernameGenerator';
-import { getRandomUserColor, type UserColorName } from '../utils/userColors';
+import {
+  callCreateOrUpdateUser,
+  callUpdateUsername,
+  callUpdateUserLastOnline,
+  callUpdateUserCurrentLobby
+} from './functionsClient';
+import { type UserColorName } from '../utils/userColors';
 
 export interface UserDocument {
   uid: string;
@@ -25,45 +28,17 @@ export interface UserDocument {
   lastOnline: Date;
 }
 
-export const createOrUpdateUser = async (uid: string): Promise<void> => {
-  const userRef = doc(db, 'users', uid);
-  const userSnap = await getDoc(userRef);
-  
-  if (userSnap.exists()) {
-    const data = userSnap.data();
-    // Migrate existing users without color
-    const updates: Record<string, unknown> = {
-      updatedAt: serverTimestamp(),
-      lastOnline: serverTimestamp()
-    };
-    if (!data.color) {
-      updates.color = getRandomUserColor();
-    }
-    await setDoc(userRef, updates, { merge: true });
-  } else {
-    await setDoc(userRef, {
-      uid,
-      username: generateUsername(),
-      color: getRandomUserColor(),
-      currentLobbyId: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      lastOnline: serverTimestamp()
-    });
-  }
+export const createOrUpdateUser = async (_uid: string): Promise<void> => {
+  // uid is now derived server-side from auth
+  await callCreateOrUpdateUser({});
 };
 
 export const updateUserCurrentLobby = async (
-  uid: string, 
+  _uid: string,
   lobbyId: string | null
 ): Promise<void> => {
-  console.log('Updating user currentLobbyId:', { uid, lobbyId });
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, {
-    currentLobbyId: lobbyId,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-  console.log('Successfully updated user currentLobbyId');
+  // uid is now derived server-side from auth
+  await callUpdateUserCurrentLobby({ lobbyId });
 };
 
 export const subscribeToUser = (
@@ -118,28 +93,17 @@ export const getUser = async (uid: string): Promise<UserDocument | null> => {
   return null;
 };
 
-export const updateUserLastOnline = async (uid: string): Promise<void> => {
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, {
-    lastOnline: serverTimestamp()
-  }, { merge: true });
+export const updateUserLastOnline = async (_uid: string): Promise<void> => {
+  // uid is now derived server-side from auth
+  await callUpdateUserLastOnline({});
 };
 
 export const updateUserLogoffTime = updateUserLastOnline;
 
-export const updateUsername = async (uid: string, username: string): Promise<void> => {
-  if (!username || username.trim().length === 0) {
-    throw new Error('Username cannot be empty');
-  }
-  if (username.trim().length > 50) {
-    throw new Error('Username must be 50 characters or less');
-  }
-  
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, {
-    username: username.trim(),
-    updatedAt: serverTimestamp()
-  }, { merge: true });
+export const updateUsername = async (_uid: string, username: string): Promise<void> => {
+  // Validation is now done server-side
+  // uid is now derived server-side from auth
+  await callUpdateUsername({ username });
 };
 
 export const getOnlineUsers = async (onlineThresholdMinutes: number = 2): Promise<UserDocument[]> => {

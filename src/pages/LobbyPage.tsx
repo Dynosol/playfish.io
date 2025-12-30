@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Crown, Play, Check, AlertCircle } from 'lucide-react';
+import { Crown, Check, AlertCircle } from 'lucide-react';
 import swapIcon from '@/assets/swap.png';
 import leaveIcon from '@/assets/leave.png';
 import randomizeIcon from '@/assets/randomize.png';
 import copyIcon from '@/assets/copy.png';
 import trashIcon from '@/assets/trash.png';
+import playIcon from '@/assets/play.png';
 import { useAuth } from '../contexts/AuthContext';
 import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
@@ -77,6 +78,16 @@ const LobbyPage: React.FC = () => {
 
     return unsubscribe;
   }, [userDoc?.currentLobbyId, gameId]);
+
+  // Auto-redirect to game when lobby status changes to 'playing'
+  useEffect(() => {
+    if (!lobby || !gameId || !user) return;
+
+    // If the game has started and the user is in this lobby, redirect to the game
+    if (lobby.status === 'playing' && lobby.players.includes(user.uid)) {
+      navigate(`/game/${gameId}`);
+    }
+  }, [lobby?.status, lobby?.players, user, gameId, navigate]);
 
   useEffect(() => {
     if (!user || !lobby || !gameId || hasJoined || isLeavingRef.current) return;
@@ -308,7 +319,7 @@ const LobbyPage: React.FC = () => {
                 <div className="text-center pb-3 border-b border-gray-200 bg-white p-4 rounded shadow">
                   <h1 className="text-2xl font-semibold">{lobby.name}</h1>
                   {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
-                    <div className="mt-2 inline-block bg-white px-4 py-2 rounded shadow-sm text-lg font-bold">
+                    <div className="mt-2 inline-block bg-white px-4 py-2 rounded shadow-sm text-2xl font-bold">
                       Score: <span style={{ color: colors.red }}>{historicalScores[0]}</span>
                       <span className="mx-1">-</span>
                       <span style={{ color: colors.blue }}>{historicalScores[1]}</span>
@@ -428,7 +439,7 @@ const LobbyPage: React.FC = () => {
                 )}
 
                 {/* Options */}
-                <div className="bg-white p-3 rounded shadow space-y-2 max-w-md mx-auto">
+                <div className="bg-white p-3 rounded shadow space-y-2 max-w-2xl mx-auto">
                   {/* Status Info */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
@@ -469,7 +480,7 @@ const LobbyPage: React.FC = () => {
                             }}
                           />
                         )}
-                        <Play className="h-3.5 w-3.5 relative z-10" />
+                        <img src={playIcon} alt="Play" className="h-3.5 w-3.5 relative z-10" />
                         <span className="relative z-10">Start Game</span>
                       </button>
 
@@ -480,17 +491,17 @@ const LobbyPage: React.FC = () => {
                         </p>
                       )}
 
-                      <div className="inline-flex gap-4 bg-gray-50 p-3 rounded shadow">
+                      <div className="flex flex-wrap gap-4 bg-gray-50 p-3 rounded shadow min-w-max">
                         <button
                           onClick={handleCopyInviteLink}
-                          className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity"
+                          className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
                         >
                           {copied ? <Check className="h-3 w-3" /> : <img src={copyIcon} alt="Copy" className="h-3.5 w-3.5" />}
                           {copied ? 'Copied!' : 'Copy Invite Link'}
                         </button>
                         <button
                           onClick={handleRandomizeTeams}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
                           style={{ color: colors.blue }}
                         >
                           <img src={randomizeIcon} alt="Randomize" className="h-3.5 w-3.5" />
@@ -498,7 +509,7 @@ const LobbyPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => setShowLeaveConfirm(true)}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
                           style={{ color: colors.red }}
                         >
                           <img src={leaveIcon} alt="Leave" className="h-3.5 w-3.5" />
@@ -506,7 +517,7 @@ const LobbyPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => setShowDeleteConfirm(true)}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
                           style={{ color: colors.red }}
                         >
                           <img src={trashIcon} alt="Delete" className="h-3.5 w-3.5" />
@@ -517,17 +528,17 @@ const LobbyPage: React.FC = () => {
                   )}
 
                   {lobby.status === 'waiting' && isInThisLobby && !isHost && (
-                    <div className="inline-flex gap-4 bg-gray-50 p-3 rounded shadow">
+                    <div className="flex gap-4 bg-gray-50 p-3 rounded shadow min-w-max">
                       <button
                         onClick={handleCopyInviteLink}
-                        className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity"
+                        className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
                       >
                         {copied ? <Check className="h-3 w-3" /> : <img src={copyIcon} alt="Copy" className="h-3.5 w-3.5" />}
                         {copied ? 'Copied!' : 'Copy Invite Link'}
                       </button>
                       <button
                         onClick={() => setShowLeaveConfirm(true)}
-                        className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                        className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
                         style={{ color: colors.red }}
                       >
                         <img src={leaveIcon} alt="Leave" className="h-3.5 w-3.5" />
