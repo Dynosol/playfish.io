@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.startDeclaration = exports.askForCard = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.sendMessage = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.startDeclaration = exports.askForCard = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.sendMessage = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -63,4 +63,5 @@ Object.defineProperty(exports, "voteForReplay", { enumerable: true, get: functio
 Object.defineProperty(exports, "leaveGame", { enumerable: true, get: function () { return game_1.leaveGame; } });
 Object.defineProperty(exports, "returnToGame", { enumerable: true, get: function () { return game_1.returnToGame; } });
 Object.defineProperty(exports, "forfeitGame", { enumerable: true, get: function () { return game_1.forfeitGame; } });
+Object.defineProperty(exports, "checkInactiveGames", { enumerable: true, get: function () { return game_1.checkInactiveGames; } });
 //# sourceMappingURL=index.js.map

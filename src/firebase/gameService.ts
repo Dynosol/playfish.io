@@ -46,6 +46,7 @@ export interface DeclarePhase {
 export interface LeftPlayer {
   odId: string;
   odAt: number; // timestamp when player left
+  reason?: 'left' | 'inactive'; // why the player is marked as left
 }
 
 export interface Game {
@@ -67,6 +68,7 @@ export interface Game {
   replayVotes: string[];
   leftPlayer: LeftPlayer | null;
   createdAt: Date;
+  lastActivityAt?: number; // timestamp of last action (for inactivity detection)
 }
 
 // Archive functions are now handled by Cloud Functions

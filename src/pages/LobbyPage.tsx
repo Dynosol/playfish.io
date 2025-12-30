@@ -283,7 +283,7 @@ const LobbyPage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Chat */}
         <div className="p-3 shrink-0">
-          {gameId && isInThisLobby ? (
+          {gameId && user ? (
             <ChatBox chatId={gameId} className="border border-gray-200" title="Lobby Chat" />
           ) : (
             <div className="w-72" />

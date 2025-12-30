@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { checkRateLimit } from '../rateLimiter';
@@ -32,6 +33,7 @@ interface Declaration {
 interface LeftPlayer {
   odId: string;
   odAt: number;
+  reason?: 'left' | 'inactive';
 }
 
 interface Game {
@@ -53,9 +55,11 @@ interface Game {
   replayVotes: string[];
   leftPlayer: LeftPlayer | null;
   createdAt: Date;
+  lastActivityAt: number; // timestamp of last action
 }
 
 const LEAVE_TIMEOUT_SECONDS = 60;
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
 // Helper functions
 const suits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
@@ -217,7 +221,8 @@ export const createGame = async (
     gameOver: null,
     replayVotes: [],
     leftPlayer: null,
-    createdAt: FieldValue.serverTimestamp()
+    createdAt: FieldValue.serverTimestamp(),
+    lastActivityAt: Date.now()
   };
 
   const docRef = await db.collection('games').add(gameData);
@@ -266,7 +271,10 @@ export const askForCard = onCall({ cors: true }, async (request) => {
       throw new HttpsError('failed-precondition', 'Game is paused during declaration phase');
     }
     if (game.leftPlayer) {
-      throw new HttpsError('failed-precondition', 'Game is paused - a player has left');
+      // Allow action if it's the inactive player making a move (clears the pause)
+      if (game.leftPlayer.reason !== 'inactive' || game.leftPlayer.odId !== askerId) {
+        throw new HttpsError('failed-precondition', 'Game is paused - a player has left');
+      }
     }
     if (game.currentTurn !== askerId) {
       throw new HttpsError('failed-precondition', 'It is not your turn');
@@ -297,10 +305,15 @@ export const askForCard = onCall({ cors: true }, async (request) => {
 
     const newTurn: Turn = { askerId, targetId, card, success: targetHasCard, timestamp: new Date() };
 
+    // Clear leftPlayer if this was an inactive player resuming
+    const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === askerId;
+
     transaction.update(gameRef, {
       playerHands: updatedPlayerHands,
       currentTurn: targetHasCard ? askerId : targetId,
-      turns: [...game.turns, newTurn]
+      turns: [...game.turns, newTurn],
+      lastActivityAt: Date.now(),
+      ...(shouldClearLeftPlayer && { leftPlayer: null })
     });
 
     return { success: true };
@@ -340,13 +353,23 @@ export const startDeclaration = onCall({ cors: true }, async (request) => {
       throw new HttpsError('failed-precondition', 'A declaration is already in progress');
     }
     if (game.leftPlayer) {
-      throw new HttpsError('failed-precondition', 'Game is paused - a player has left');
+      // Allow action if it's the inactive player making a move (clears the pause)
+      if (game.leftPlayer.reason !== 'inactive' || game.leftPlayer.odId !== declareeId) {
+        throw new HttpsError('failed-precondition', 'Game is paused - a player has left');
+      }
     }
     if (!isPlayerAlive(game, declareeId)) {
       throw new HttpsError('failed-precondition', 'You must have cards to declare');
     }
 
-    transaction.update(gameRef, { declarePhase: { active: true, declareeId } });
+    // Clear leftPlayer if this was an inactive player resuming
+    const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === declareeId;
+
+    transaction.update(gameRef, {
+      declarePhase: { active: true, declareeId },
+      lastActivityAt: Date.now(),
+      ...(shouldClearLeftPlayer && { leftPlayer: null })
+    });
 
     return { success: true };
   });
@@ -443,7 +466,8 @@ export const finishDeclaration = onCall({ cors: true }, async (request) => {
       completedHalfsuits: [...game.completedHalfsuits, halfSuit],
       declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, timestamp: new Date() }],
       declarePhase: null,
-      gameOver
+      gameOver,
+      lastActivityAt: Date.now()
     });
 
     return { success: true, gameOver, wasGameOver, updatedScores, gameId: game.gameId };
@@ -585,7 +609,8 @@ export const leaveGame = onCall({ cors: true }, async (request) => {
     transaction.update(gameRef, {
       leftPlayer: {
         odId: playerId,
-        odAt: Date.now()
+        odAt: Date.now(),
+        reason: 'left'
       }
     });
 
@@ -637,7 +662,10 @@ export const returnToGame = onCall({ cors: true }, async (request) => {
       throw new HttpsError('failed-precondition', 'Return timeout has expired');
     }
 
-    transaction.update(gameRef, { leftPlayer: null });
+    transaction.update(gameRef, {
+      leftPlayer: null,
+      lastActivityAt: Date.now()
+    });
 
     return { success: true };
   });
@@ -715,4 +743,77 @@ export const forfeitGame = onCall({ cors: true }, async (request) => {
   await archiveUnfinishedGame(gameDocId, result.game, 'forfeit');
 
   return { success: true };
+});
+
+// Scheduled function to check for inactive games and auto-forfeit them
+// Runs every minute to check for games that have been inactive for 1 hour
+export const checkInactiveGames = onSchedule('every 1 minutes', async () => {
+  const now = Date.now();
+  const inactivityThreshold = now - INACTIVITY_TIMEOUT_MS;
+  const leaveTimeoutThreshold = now - (LEAVE_TIMEOUT_SECONDS * 1000);
+
+  // Find active games (no gameOver) that have been inactive
+  const gamesSnapshot = await db.collection('games')
+    .where('gameOver', '==', null)
+    .get();
+
+  for (const gameDoc of gamesSnapshot.docs) {
+    const game = { id: gameDoc.id, ...gameDoc.data() } as Game;
+
+    // Skip if game is in declare phase (declaree is working on declaration)
+    if (game.declarePhase?.active) {
+      continue;
+    }
+
+    // Skip if game already has a left player (countdown already in progress)
+    if (game.leftPlayer) {
+      // Check if the leave timeout has expired - auto-forfeit
+      if (game.leftPlayer.odAt <= leaveTimeoutThreshold) {
+        const leftPlayerTeam = game.teams[game.leftPlayer.odId];
+        const winningTeam = leftPlayerTeam === 0 ? 1 : 0;
+
+        // Update game to forfeit
+        await gameDoc.ref.update({
+          gameOver: { winner: winningTeam },
+          leftPlayer: null
+        });
+
+        // Update lobby historical scores
+        const lobbyRef = db.collection('lobbies').doc(game.gameId);
+        const lobbySnap = await lobbyRef.get();
+        if (lobbySnap.exists) {
+          const current = lobbySnap.data()?.historicalScores || { 0: 0, 1: 0 };
+          const updatedScores = { ...current };
+          updatedScores[winningTeam]++;
+          await lobbyRef.update({ historicalScores: updatedScores });
+        }
+
+        // Archive the abandoned game
+        const updatedGame: Game = {
+          ...game,
+          gameOver: { winner: winningTeam },
+          leftPlayer: null
+        };
+        await archiveUnfinishedGame(game.id, updatedGame, 'abandoned');
+
+        console.log(`Auto-forfeited game ${game.id} due to player ${game.leftPlayer.odId} timeout`);
+      }
+      continue;
+    }
+
+    // Check if game has been inactive for 1 hour
+    const lastActivity = game.lastActivityAt || (game.createdAt as unknown as { _seconds: number })?._seconds * 1000;
+    if (lastActivity && lastActivity <= inactivityThreshold) {
+      // Set leftPlayer to current turn player to start the 60s countdown
+      await gameDoc.ref.update({
+        leftPlayer: {
+          odId: game.currentTurn,
+          odAt: now,
+          reason: 'inactive'
+        }
+      });
+
+      console.log(`Game ${game.id} marked inactive, starting 60s countdown for player ${game.currentTurn}`);
+    }
+  }
 });

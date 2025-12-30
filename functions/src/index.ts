@@ -32,5 +32,6 @@ export {
   voteForReplay,
   leaveGame,
   returnToGame,
-  forfeitGame
+  forfeitGame,
+  checkInactiveGames
 } from './handlers/game';

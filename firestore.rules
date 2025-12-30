@@ -24,10 +24,10 @@ service cloud.firestore {
         // Global chat: any authenticated user can read
         allow read: if request.auth != null && chatId == 'global';
 
-        // Lobby/game chat: only players in the lobby can read
+        // Lobby/game chat: any authenticated user can read (allows spectators)
         allow read: if request.auth != null &&
                     chatId != 'global' &&
-                    request.auth.uid in get(/databases/$(database)/documents/lobbies/$(chatId)).data.players;
+                    exists(/databases/$(database)/documents/lobbies/$(chatId));
 
         // Writes are now handled by Cloud Functions
         allow create, update, delete: if false;

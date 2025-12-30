@@ -672,10 +672,21 @@ const GamePage: React.FC = () => {
                 <div className="flex flex-col gap-0.5">
                   <span className="font-semibold text-red-600">Game Paused</span>
                   <span className="text-xs text-red-500">
-                    <span className="font-semibold" style={{ color: getUserColor(game.leftPlayer.odId) }}>{getUsername(game.leftPlayer.odId)}</span> has left the game.
-                    {leaveCountdown !== null && (
-                      <span className="font-semibold"> {leaveCountdown}s</span>
-                    )} to return or the game ends.
+                    {game.leftPlayer.reason === 'inactive' ? (
+                      <>
+                        Game inactive for 1 hour. <span className="font-semibold" style={{ color: getUserColor(game.leftPlayer.odId) }}>{game.leftPlayer.odId === user?.uid ? 'You have' : `${getUsername(game.leftPlayer.odId)} has`}</span>
+                        {leaveCountdown !== null && (
+                          <span className="font-semibold"> {leaveCountdown}s</span>
+                        )} to make a move or the game ends.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold" style={{ color: getUserColor(game.leftPlayer.odId) }}>{getUsername(game.leftPlayer.odId)}</span> has left the game.
+                        {leaveCountdown !== null && (
+                          <span className="font-semibold"> {leaveCountdown}s</span>
+                        )} to return or the game ends.
+                      </>
+                    )}
                   </span>
                 </div>
               </div>

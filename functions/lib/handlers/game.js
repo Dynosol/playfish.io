@@ -33,13 +33,15 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
 const db = admin.firestore();
 const LEAVE_TIMEOUT_SECONDS = 60;
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 // Helper functions
 const suits = ['spades', 'hearts', 'diamonds', 'clubs'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
@@ -174,7 +176,8 @@ const createGame = async (gameId, players, teamAssignments, lobbyUuid) => {
         gameOver: null,
         replayVotes: [],
         leftPlayer: null,
-        createdAt: firestore_1.FieldValue.serverTimestamp()
+        createdAt: firestore_1.FieldValue.serverTimestamp(),
+        lastActivityAt: Date.now()
     };
     const docRef = await db.collection('games').add(gameData);
     return docRef.id;
@@ -207,7 +210,10 @@ exports.askForCard = (0, https_1.onCall)({ cors: true }, async (request) => {
             throw new https_1.HttpsError('failed-precondition', 'Game is paused during declaration phase');
         }
         if (game.leftPlayer) {
-            throw new https_1.HttpsError('failed-precondition', 'Game is paused - a player has left');
+            // Allow action if it's the inactive player making a move (clears the pause)
+            if (game.leftPlayer.reason !== 'inactive' || game.leftPlayer.odId !== askerId) {
+                throw new https_1.HttpsError('failed-precondition', 'Game is paused - a player has left');
+            }
         }
         if (game.currentTurn !== askerId) {
             throw new https_1.HttpsError('failed-precondition', 'It is not your turn');
@@ -231,10 +237,14 @@ exports.askForCard = (0, https_1.onCall)({ cors: true }, async (request) => {
             updatedPlayerHands[askerId] = [...askerHand, card];
         }
         const newTurn = { askerId, targetId, card, success: targetHasCard, timestamp: new Date() };
+        // Clear leftPlayer if this was an inactive player resuming
+        const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === askerId;
         transaction.update(gameRef, {
             playerHands: updatedPlayerHands,
             currentTurn: targetHasCard ? askerId : targetId,
-            turns: [...game.turns, newTurn]
+            turns: [...game.turns, newTurn],
+            lastActivityAt: Date.now(),
+            ...(shouldClearLeftPlayer && { leftPlayer: null })
         });
         return { success: true };
     });
@@ -260,12 +270,21 @@ exports.startDeclaration = (0, https_1.onCall)({ cors: true }, async (request) =
             throw new https_1.HttpsError('failed-precondition', 'A declaration is already in progress');
         }
         if (game.leftPlayer) {
-            throw new https_1.HttpsError('failed-precondition', 'Game is paused - a player has left');
+            // Allow action if it's the inactive player making a move (clears the pause)
+            if (game.leftPlayer.reason !== 'inactive' || game.leftPlayer.odId !== declareeId) {
+                throw new https_1.HttpsError('failed-precondition', 'Game is paused - a player has left');
+            }
         }
         if (!isPlayerAlive(game, declareeId)) {
             throw new https_1.HttpsError('failed-precondition', 'You must have cards to declare');
         }
-        transaction.update(gameRef, { declarePhase: { active: true, declareeId } });
+        // Clear leftPlayer if this was an inactive player resuming
+        const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === declareeId;
+        transaction.update(gameRef, {
+            declarePhase: { active: true, declareeId },
+            lastActivityAt: Date.now(),
+            ...(shouldClearLeftPlayer && { leftPlayer: null })
+        });
         return { success: true };
     });
 });
@@ -338,7 +357,8 @@ exports.finishDeclaration = (0, https_1.onCall)({ cors: true }, async (request) 
             completedHalfsuits: [...game.completedHalfsuits, halfSuit],
             declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, timestamp: new Date() }],
             declarePhase: null,
-            gameOver
+            gameOver,
+            lastActivityAt: Date.now()
         });
         return { success: true, gameOver, wasGameOver, updatedScores, gameId: game.gameId };
     });
@@ -439,7 +459,8 @@ exports.leaveGame = (0, https_1.onCall)({ cors: true }, async (request) => {
         transaction.update(gameRef, {
             leftPlayer: {
                 odId: playerId,
-                odAt: Date.now()
+                odAt: Date.now(),
+                reason: 'left'
             }
         });
         return { success: true };
@@ -475,7 +496,10 @@ exports.returnToGame = (0, https_1.onCall)({ cors: true }, async (request) => {
         if (elapsed >= LEAVE_TIMEOUT_SECONDS * 1000) {
             throw new https_1.HttpsError('failed-precondition', 'Return timeout has expired');
         }
-        transaction.update(gameRef, { leftPlayer: null });
+        transaction.update(gameRef, {
+            leftPlayer: null,
+            lastActivityAt: Date.now()
+        });
         return { success: true };
     });
 });
@@ -531,5 +555,67 @@ exports.forfeitGame = (0, https_1.onCall)({ cors: true }, async (request) => {
     // Archive the forfeited game
     await archiveUnfinishedGame(gameDocId, result.game, 'forfeit');
     return { success: true };
+});
+// Scheduled function to check for inactive games and auto-forfeit them
+// Runs every minute to check for games that have been inactive for 1 hour
+exports.checkInactiveGames = (0, scheduler_1.onSchedule)('every 1 minutes', async () => {
+    const now = Date.now();
+    const inactivityThreshold = now - INACTIVITY_TIMEOUT_MS;
+    const leaveTimeoutThreshold = now - (LEAVE_TIMEOUT_SECONDS * 1000);
+    // Find active games (no gameOver) that have been inactive
+    const gamesSnapshot = await db.collection('games')
+        .where('gameOver', '==', null)
+        .get();
+    for (const gameDoc of gamesSnapshot.docs) {
+        const game = { id: gameDoc.id, ...gameDoc.data() };
+        // Skip if game is in declare phase (declaree is working on declaration)
+        if (game.declarePhase?.active) {
+            continue;
+        }
+        // Skip if game already has a left player (countdown already in progress)
+        if (game.leftPlayer) {
+            // Check if the leave timeout has expired - auto-forfeit
+            if (game.leftPlayer.odAt <= leaveTimeoutThreshold) {
+                const leftPlayerTeam = game.teams[game.leftPlayer.odId];
+                const winningTeam = leftPlayerTeam === 0 ? 1 : 0;
+                // Update game to forfeit
+                await gameDoc.ref.update({
+                    gameOver: { winner: winningTeam },
+                    leftPlayer: null
+                });
+                // Update lobby historical scores
+                const lobbyRef = db.collection('lobbies').doc(game.gameId);
+                const lobbySnap = await lobbyRef.get();
+                if (lobbySnap.exists) {
+                    const current = lobbySnap.data()?.historicalScores || { 0: 0, 1: 0 };
+                    const updatedScores = { ...current };
+                    updatedScores[winningTeam]++;
+                    await lobbyRef.update({ historicalScores: updatedScores });
+                }
+                // Archive the abandoned game
+                const updatedGame = {
+                    ...game,
+                    gameOver: { winner: winningTeam },
+                    leftPlayer: null
+                };
+                await archiveUnfinishedGame(game.id, updatedGame, 'abandoned');
+                console.log(`Auto-forfeited game ${game.id} due to player ${game.leftPlayer.odId} timeout`);
+            }
+            continue;
+        }
+        // Check if game has been inactive for 1 hour
+        const lastActivity = game.lastActivityAt || game.createdAt?._seconds * 1000;
+        if (lastActivity && lastActivity <= inactivityThreshold) {
+            // Set leftPlayer to current turn player to start the 60s countdown
+            await gameDoc.ref.update({
+                leftPlayer: {
+                    odId: game.currentTurn,
+                    odAt: now,
+                    reason: 'inactive'
+                }
+            });
+            console.log(`Game ${game.id} marked inactive, starting 60s countdown for player ${game.currentTurn}`);
+        }
+    }
 });
 //# sourceMappingURL=game.js.map
