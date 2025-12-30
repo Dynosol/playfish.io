@@ -198,7 +198,7 @@ const StartPage: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Global Chat */}
         <div className="p-3 shrink-0">
-          <ChatBox chatId="global" className="border border-gray-200" />
+          <ChatBox chatId="global" className="border border-gray-200" title="Global Chat" />
         </div>
 
         <main className="flex-1 overflow-y-auto p-3">

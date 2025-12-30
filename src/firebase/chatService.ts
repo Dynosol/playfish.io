@@ -4,9 +4,11 @@ import {
   query,
   orderBy,
   limit,
+  where,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  QueryConstraint
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -42,14 +44,22 @@ export const sendMessage = async (
 export const subscribeToMessages = (
   chatId: string,
   callback: (messages: ChatMessage[]) => void,
-  messageLimit: number = 100
+  options: { messageLimit?: number; maxAgeHours?: number } = {}
 ): (() => void) => {
+  const { messageLimit = 100, maxAgeHours } = options;
   const messagesRef = getMessagesRef(chatId);
-  const messagesQuery = query(
-    messagesRef,
+
+  const queryConstraints: QueryConstraint[] = [
     orderBy('timestamp', 'asc'),
     limit(messageLimit)
-  );
+  ];
+
+  if (maxAgeHours !== undefined) {
+    const cutoffDate = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+    queryConstraints.unshift(where('timestamp', '>=', Timestamp.fromDate(cutoffDate)));
+  }
+
+  const messagesQuery = query(messagesRef, ...queryConstraints);
 
   return onSnapshot(
     messagesQuery,

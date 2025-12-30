@@ -5,8 +5,9 @@ import swapIcon from '@/assets/swap.png';
 import leaveIcon from '@/assets/leave.png';
 import randomizeIcon from '@/assets/randomize.png';
 import copyIcon from '@/assets/copy.png';
+import trashIcon from '@/assets/trash.png';
 import { useAuth } from '../contexts/AuthContext';
-import { leaveLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
+import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { subscribeToUser, type UserDocument } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
@@ -14,6 +15,17 @@ import { getUserColorHex } from '../utils/userColors';
 import { colors } from '../utils/colors';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
+
+const shimmerKeyframes = `
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+`;
 
 const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -24,6 +36,7 @@ const LobbyPage: React.FC = () => {
   const [userCurrentLobby, setUserCurrentLobby] = useState<Lobby | null>(null);
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isLeavingRef = useRef(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -105,6 +118,17 @@ const LobbyPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to leave lobby:', error);
       isLeavingRef.current = false;
+    }
+  };
+
+  const handleDeleteLobby = async () => {
+    if (!user || !gameId) return;
+
+    try {
+      await deleteLobby(gameId, user.uid);
+      navigate('/');
+    } catch (error) {
+      console.error('Failed to delete lobby:', error);
     }
   };
 
@@ -218,10 +242,10 @@ const LobbyPage: React.FC = () => {
 
     return (
       <tr>
-        <td className="py-1 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
-        <td className="py-1" colSpan={2}>
-          <div className="inline-flex items-center bg-white px-3 py-1.5 rounded shadow-sm">
-            <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
+        <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
+        <td className="py-2" colSpan={2}>
+          <div className="inline-flex items-center bg-white px-3 py-2 rounded shadow-sm">
+            <span className="text-base font-semibold" style={{ color: getUserColor(playerId) }}>
               {isCurrentUser ? 'You' : getUsername(playerId)}
             </span>
             {isPlayerHost && (
@@ -249,7 +273,7 @@ const LobbyPage: React.FC = () => {
         {/* Left Sidebar - Chat */}
         <div className="p-3 shrink-0">
           {gameId && isInThisLobby ? (
-            <ChatBox chatId={gameId} className="border border-gray-200" />
+            <ChatBox chatId={gameId} className="border border-gray-200" title="Lobby Chat" />
           ) : (
             <div className="w-72" />
           )}
@@ -296,7 +320,7 @@ const LobbyPage: React.FC = () => {
                 {lobby.status === 'waiting' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Red Team */}
-                    <div className="bg-gray-50 p-3 rounded shadow">
+                    <div className="bg-gray-50 p-4 pb-6 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.red}` }}>
@@ -315,8 +339,8 @@ const LobbyPage: React.FC = () => {
                               <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-0-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
-                                <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
+                                <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
+                                <td className="py-2 text-base text-gray-300 italic" colSpan={2}>Empty</td>
                               </tr>
                             );
                           })}
@@ -334,7 +358,7 @@ const LobbyPage: React.FC = () => {
                     </div>
 
                     {/* Blue Team */}
-                    <div className="bg-gray-50 p-3 rounded shadow">
+                    <div className="bg-gray-50 p-4 pb-6 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.blue}` }}>
@@ -353,8 +377,8 @@ const LobbyPage: React.FC = () => {
                               <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
                             ) : (
                               <tr key={`empty-1-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-sm text-black font-bold w-6">{index + 1}</td>
-                                <td className="py-2 text-sm text-gray-300 italic" colSpan={2}>Empty</td>
+                                <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
+                                <td className="py-2 text-base text-gray-300 italic" colSpan={2}>Empty</td>
                               </tr>
                             );
                           })}
@@ -408,28 +432,45 @@ const LobbyPage: React.FC = () => {
                   {/* Status Info */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
-                    <div
-                      className="px-3 py-1 text-xs font-normal rounded-full text-white"
-                      style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : '#f59e0b' }}
-                    >
-                      {lobby.status === 'waiting' ? 'Waiting for more players' : 'In Progress'}
-                    </div>
+                    {(lobby.status === 'playing' || lobby.players.length < 2 || !teamsEven) && (
+                      <div
+                        className="px-3 py-1 text-xs font-normal rounded-full text-white"
+                        style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : '#f59e0b' }}
+                      >
+                        {lobby.status === 'waiting'
+                          ? (lobby.players.length >= 2 && !teamsEven
+                              ? 'Teams must be balanced to start'
+                              : 'Waiting for more players')
+                          : 'In Progress'}
+                      </div>
+                    )}
                   </div>
 
                   {lobby.status === 'waiting' && isInThisLobby && isHost && (
                     <>
+                      <style>{shimmerKeyframes}</style>
                       <button
                         onClick={handleStartLobby}
                         disabled={!teamsEven || lobby.players.length < 2}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium transition-all rounded"
+                        className="w-full relative overflow-hidden flex items-center justify-center gap-2 py-2 text-sm font-medium transition-all rounded"
                         style={{
                           backgroundColor: teamsEven && lobby.players.length >= 2 ? colors.purple : '#e5e7eb',
                           color: teamsEven && lobby.players.length >= 2 ? 'white' : '#9ca3af',
                           cursor: teamsEven && lobby.players.length >= 2 ? 'pointer' : 'not-allowed'
                         }}
                       >
-                        <Play className="h-3.5 w-3.5" />
-                        Start Game
+                        {teamsEven && lobby.players.length >= 2 && (
+                          <div
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 35%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.15) 65%, transparent 100%)',
+                              backgroundSize: '300% 100%',
+                              animation: 'shimmer 3s linear infinite',
+                            }}
+                          />
+                        )}
+                        <Play className="h-3.5 w-3.5 relative z-10" />
+                        <span className="relative z-10">Start Game</span>
                       </button>
 
                       {!teamsEven && (
@@ -462,6 +503,14 @@ const LobbyPage: React.FC = () => {
                         >
                           <img src={leaveIcon} alt="Leave" className="h-3.5 w-3.5" />
                           Leave Lobby
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity"
+                          style={{ color: colors.red }}
+                        >
+                          <img src={trashIcon} alt="Delete" className="h-3.5 w-3.5" />
+                          Delete Lobby
                         </button>
                       </div>
                     </>
@@ -545,6 +594,34 @@ const LobbyPage: React.FC = () => {
                 style={{ backgroundColor: colors.red }}
               >
                 Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full mx-4">
+            <h2 className="text-lg font-semibold mb-2">Delete Lobby?</h2>
+            <p className="text-sm text-gray-500 mb-4">This will permanently delete the lobby and remove all players. This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  handleDeleteLobby();
+                }}
+                className="flex-1 py-2 text-sm font-medium text-white rounded hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: colors.red }}
+              >
+                Delete
               </button>
             </div>
           </div>

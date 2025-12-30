@@ -247,6 +247,30 @@ export const leaveLobby = async (lobbyId: string, userId: string): Promise<void>
   console.log('User currentLobbyId set to null');
 };
 
+export const deleteLobby = async (lobbyId: string, userId: string): Promise<void> => {
+  const lobbyRef = doc(db, 'lobbies', lobbyId);
+  const lobbySnap = await getDoc(lobbyRef);
+
+  if (!lobbySnap.exists()) {
+    throw new Error('Lobby not found');
+  }
+
+  const lobbyData = lobbySnap.data() as Lobby;
+
+  // Only the host can delete the lobby
+  if (lobbyData.createdBy !== userId) {
+    throw new Error('Only the host can delete the lobby');
+  }
+
+  // Clear currentLobbyId for all players
+  for (const playerId of lobbyData.players) {
+    await updateUserCurrentLobby(playerId, null);
+  }
+
+  // Move to deleted collection
+  await moveLobbyToDeleted(lobbyId, lobbyData);
+};
+
 export const joinTeam = async (lobbyId: string, userId: string, team: 0 | 1): Promise<void> => {
   const lobbyRef = doc(db, 'lobbies', lobbyId);
   
@@ -290,17 +314,20 @@ export const swapPlayerTeam = async (lobbyId: string, playerId: string): Promise
 export const areTeamsEven = (lobby: Lobby): boolean => {
   let team0Count = 0;
   let team1Count = 0;
-  
+
   for (const playerId of lobby.players) {
     const team = lobby.teams[playerId];
-    if (team === 0) {
+    // Use == to handle potential type coercion from Firestore
+    if (team == 0) {
       team0Count++;
-    } else if (team === 1) {
+    } else if (team == 1) {
       team1Count++;
     }
   }
-  
-  return team0Count === team1Count && team0Count > 0;
+
+  // Check: equal teams, at least one per team, and no unassigned players
+  const totalAssigned = team0Count + team1Count;
+  return team0Count === team1Count && team0Count > 0 && totalAssigned === lobby.players.length;
 };
 
 export const randomizeTeams = async (lobbyId: string, _playerId: string): Promise<void> => { 
@@ -349,7 +376,7 @@ const startGameFromLobby = async (lobbyId: string): Promise<void> => {
     teamAssignments[playerId] = team;
   }
 
-  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid);
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId);
 
   await updateDoc(lobbyRef, {
     status: 'playing',
