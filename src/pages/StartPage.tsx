@@ -318,11 +318,11 @@ const StartPage: React.FC = () => {
           {/* Right Center: Create Game */}
           <div>
             <Card>
-              <CardHeader>
-                <CardDescription>Set up a new game room for you and your friends.</CardDescription>
+              <CardHeader className="p-3 pb-2">
+                <CardDescription className="text-black font-semibold">Create Game</CardDescription>
               </CardHeader>
               <form onSubmit={handleCreateLobby}>
-                <CardContent className="space-y-4">
+                <CardContent className="p-3 pt-0 space-y-3">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between gap-4">
                       <label htmlFor="lobbyName" className="text-sm font-medium">Lobby name</label>
@@ -359,7 +359,7 @@ const StartPage: React.FC = () => {
                     </select>
                   </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="p-3 pt-0">
                   <Button
                     className="w-full rounded text-white"
                     style={{ backgroundColor: currentLobby ? '#9ca3af' : colors.purple }}

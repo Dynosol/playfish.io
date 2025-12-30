@@ -88,7 +88,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
 
   return (
     <Card className={cn("w-72 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)}>
-      <CardHeader className="p-3 flex flex-row items-center space-y-0">
+      <CardHeader className="p-3 flex flex-row items-center space-y-0 shrink-0 border-b border-gray-200">
         <CardTitle className="text-sm font-medium">
           {isGlobalChat ? 'Global Chat' : 'Chat'}
         </CardTitle>
@@ -96,7 +96,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className }) => {
       <CardContent className="p-0 flex flex-col">
         <div
           ref={messagesContainerRef}
-          className="h-64 overflow-y-auto p-3"
+          className="h-80 overflow-y-auto p-3"
           onMouseDown={(e) => {
             // Prevent clicks on messages area from stealing focus from input
             e.preventDefault();
