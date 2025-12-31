@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
+import SEO from '@/components/SEO';
 import { subscribeToUser } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
@@ -193,21 +194,26 @@ const StartPage: React.FC = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
+      <SEO
+        title="Play Fish Online"
+        description="Play Fish online - the classic 6-player team card game of deduction and strategy. Create or join a game, form teams, and compete in real-time multiplayer matches. Not Go Fish!"
+        canonical="/"
+      />
       <Header type="home" />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Global Chat */}
-        <div className="p-3 shrink-0">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Sidebar - Global Chat (hidden on mobile) */}
+        <div className="hidden lg:block p-3 shrink-0">
           <ChatBox chatId="global" className="border border-gray-200" title="Global Chat" />
         </div>
 
-        <main className="flex-1 overflow-y-auto p-3">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-3">
           <div className="container mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
           {/* Center: Lobby List */}
-          <div className="lg:col-span-2 space-y-3">
+          <div className="lg:col-span-2 space-y-2 sm:space-y-3">
             <Card>
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-scroll [&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
                 {loadingLobbies ? (
                   <div className="p-8 text-center text-muted-foreground">Loading lobbies...</div>
                 ) : lobbies.length === 0 ? (
@@ -215,9 +221,9 @@ const StartPage: React.FC = () => {
                     No active lobbies found. Create one to get started!
                   </div>
                 ) : (
-                  <Table>
+                  <Table className="min-w-[500px]">
                     <TableHeader>
-                      <TableRow className="h-8">
+                      <TableRow className="h-8 text-xs sm:text-sm">
                         <TableHead className="py-1">Lobby Name</TableHead>
                         <TableHead className="py-1">Host</TableHead>
                         <TableHead className="py-1">Players</TableHead>
@@ -250,13 +256,18 @@ const StartPage: React.FC = () => {
                               {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                             </TableCell>
                             <TableCell className="py-1">
-                              <Badge
-                                className="font-normal text-white"
-                                style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : undefined }}
-                                variant={lobby.status === 'waiting' ? 'default' : 'secondary'}
-                              >
-                                {lobby.status === 'waiting' ? (isFull ? 'Waiting to start' : 'Waiting for players') : 'In Progress'}
-                              </Badge>
+                              {lobby.status === 'waiting' ? (
+                                <Badge
+                                  className="font-normal text-white"
+                                  style={{ backgroundColor: colors.purple }}
+                                >
+                                  {isFull ? 'Waiting to start' : 'Waiting for players'}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-400 text-white">
+                                  In Progress
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="py-1 text-right">
                               {isInThisLobby ? (
@@ -372,6 +383,11 @@ const StartPage: React.FC = () => {
               </form>
             </Card>
           </div>
+            </div>
+
+            {/* Mobile Chat - shown at bottom on mobile, inside main content area for consistent spacing */}
+            <div className="lg:hidden mt-2 sm:mt-3">
+              <ChatBox chatId="global" className="border border-gray-200 rounded-lg h-48" title="Global Chat" />
             </div>
           </div>
         </main>

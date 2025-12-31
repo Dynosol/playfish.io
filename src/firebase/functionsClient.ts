@@ -105,6 +105,11 @@ export const callStartDeclaration = createCallable<
   { success: boolean; error?: string }
 >('startDeclaration');
 
+export const callAbortDeclaration = createCallable<
+  { gameDocId: string },
+  { success: boolean; error?: string }
+>('abortDeclaration');
+
 export const callFinishDeclaration = createCallable<
   { gameDocId: string; halfSuit: string; team: 0 | 1; assignments: { [cardKey: string]: string } },
   { success: boolean; error?: string }

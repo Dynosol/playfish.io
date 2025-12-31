@@ -82,20 +82,20 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
   return (
     <>
       <header className={cn("w-full z-50 sticky top-0 bg-background border-b", className)}>
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between relative">
+        <div className="container mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between relative">
           {/* Left: Logo */}
           <div
             className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={handleHomeClick}
           >
-            <img src={fishIcon} alt="Fish" className="h-8 w-8" />
-            <img src={playfishLogo} alt="playfish.io" className="h-10" />
+            <img src={fishIcon} alt="Fish" className="h-6 w-6 sm:h-8 sm:w-8" />
+            <img src={playfishLogo} alt="playfish.io" className="h-8 sm:h-10 hidden xs:block sm:block" />
           </div>
 
-          {/* Center: Dynamic Content */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+          {/* Center: Dynamic Content - hidden on mobile */}
+          <div className="hidden sm:flex absolute left-1/2 -translate-x-1/2 items-center justify-center">
             {type === 'game' ? (
-              <span className="font-medium text-lg">Game Room: {roomName}</span>
+              <span className="font-medium text-base sm:text-lg">Game Room: {roomName}</span>
             ) : (
               <div className="flex items-center gap-2 font-medium text-lg">
                 <span>Welcome,{' '}</span>
@@ -170,7 +170,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
 
       {/* Settings Popup */}
       {showSettings && (
-        <div className="fixed top-20 right-4 z-50 w-80 animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
+        <div className="fixed top-16 sm:top-20 right-2 sm:right-4 z-50 w-[calc(100vw-1rem)] sm:w-80 max-w-sm animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
           <Card className="border border-gray-200">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">

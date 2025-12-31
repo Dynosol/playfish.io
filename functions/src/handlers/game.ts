@@ -377,6 +377,51 @@ export const startDeclaration = onCall({ cors: corsOrigins }, async (request) =>
   });
 });
 
+interface AbortDeclarationData {
+  gameDocId: string;
+}
+
+export const abortDeclaration = onCall({ cors: corsOrigins }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const declareeId = request.auth.uid;
+  const { gameDocId } = request.data as AbortDeclarationData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+
+  await checkRateLimit(declareeId, 'game:abortDeclaration');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.declarePhase?.active) {
+      throw new HttpsError('failed-precondition', 'No declaration is in progress');
+    }
+    if (game.declarePhase.declareeId !== declareeId) {
+      throw new HttpsError('permission-denied', 'You are not the active declaree');
+    }
+
+    transaction.update(gameRef, {
+      declarePhase: null,
+      lastActivityAt: Date.now()
+    });
+
+    return { success: true };
+  });
+});
+
 interface FinishDeclarationData {
   gameDocId: string;
   halfSuit: string;

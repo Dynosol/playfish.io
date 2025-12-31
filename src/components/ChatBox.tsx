@@ -109,16 +109,16 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
   return (
     <>
       <style>{scrollbarStyles}</style>
-      <Card className={cn("w-72 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)}>
+      <Card className={cn("w-full lg:w-72 h-80 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)}>
         <CardHeader className="p-3 flex flex-row items-center space-y-0 shrink-0 border-b border-gray-200 shadow">
         <CardTitle className="text-sm font-semibold">
           {title ?? (isGlobalChat ? 'Global Chat' : 'Chat')}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-0 flex flex-col">
+      <CardContent className="p-0 flex flex-col flex-1 min-h-0">
         <div
           ref={messagesContainerRef}
-          className="h-80 overflow-y-scroll p-3 chat-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto p-3 chat-scrollbar"
           onMouseDown={(e) => {
             // Prevent clicks on messages area from stealing focus from input
             e.preventDefault();
@@ -169,7 +169,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
             </div>
           </TooltipProvider>
         </div>
-        <div className="p-3">
+        <div className="p-3 shrink-0 border-t border-gray-100">
           <form onSubmit={handleSend}>
             <input
               type="text"

@@ -7,6 +7,7 @@ import { db } from './config';
 import {
   callAskForCard,
   callStartDeclaration,
+  callAbortDeclaration,
   callFinishDeclaration,
   callVoteForReplay,
   callLeaveGame,
@@ -193,6 +194,17 @@ export const startDeclaration = async (
     return await callStartDeclaration({ gameDocId });
   } catch (error) {
     console.error('Error in startDeclaration:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const abortDeclaration = async (
+  gameDocId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callAbortDeclaration({ gameDocId });
+  } catch (error) {
+    console.error('Error in abortDeclaration:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

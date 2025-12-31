@@ -28,6 +28,7 @@ export {
 export {
   askForCard,
   startDeclaration,
+  abortDeclaration,
   finishDeclaration,
   voteForReplay,
   leaveGame,

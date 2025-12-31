@@ -8,6 +8,7 @@ import copyIcon from '@/assets/copy.png';
 import trashIcon from '@/assets/trash.png';
 import playIcon from '@/assets/play.png';
 import { useAuth } from '../contexts/AuthContext';
+import SEO from '@/components/SEO';
 import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { subscribeToUser, type UserDocument } from '../firebase/userService';
@@ -278,11 +279,16 @@ const LobbyPage: React.FC = () => {
 
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
+      <SEO
+        title={`Lobby: ${lobby?.name || 'Loading...'}`}
+        description="Fish card game lobby - waiting for players."
+        noindex={true}
+      />
       <Header type="home" />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Chat */}
-        <div className="p-3 shrink-0">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Sidebar - Chat (hidden on mobile) */}
+        <div className="hidden lg:block p-3 shrink-0">
           {gameId && user ? (
             <ChatBox chatId={gameId} className="border border-gray-200" title="Lobby Chat" />
           ) : (
@@ -290,7 +296,7 @@ const LobbyPage: React.FC = () => {
           )}
         </div>
 
-        <main className="flex-1 overflow-y-auto p-3">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-3">
           <div className="container mx-auto">
             {/* Warning if in another active game */}
             {isInActiveGameElsewhere && !isInThisLobby && (
@@ -312,12 +318,12 @@ const LobbyPage: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {/* Teams and Options */}
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {/* Lobby Header - Centered */}
-                <div className="text-center pb-3 border-b border-gray-200 bg-white p-4 rounded shadow">
-                  <h1 className="text-2xl font-semibold">{lobby.name}</h1>
+                <div className="text-center pb-2 sm:pb-3 border-b border-gray-200 bg-white p-3 sm:p-4 rounded shadow">
+                  <h1 className="text-xl sm:text-2xl font-semibold">{lobby.name}</h1>
                   {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
                     <div className="mt-2 inline-block bg-white px-4 py-2 rounded shadow-sm text-2xl font-bold">
                       Score: <span style={{ color: colors.red }}>{historicalScores[0]}</span>
@@ -329,9 +335,9 @@ const LobbyPage: React.FC = () => {
 
                 {/* Teams */}
                 {lobby.status === 'waiting' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                     {/* Red Team */}
-                    <div className="bg-gray-50 p-4 pb-6 rounded shadow">
+                    <div className="bg-gray-50 p-3 sm:p-4 pb-4 sm:pb-6 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.red}` }}>
@@ -369,7 +375,7 @@ const LobbyPage: React.FC = () => {
                     </div>
 
                     {/* Blue Team */}
-                    <div className="bg-gray-50 p-4 pb-6 rounded shadow">
+                    <div className="bg-gray-50 p-3 sm:p-4 pb-4 sm:pb-6 rounded shadow">
                       <table className="w-full">
                         <thead>
                           <tr style={{ borderBottom: `2px solid ${colors.blue}` }}>
@@ -439,7 +445,7 @@ const LobbyPage: React.FC = () => {
                 )}
 
                 {/* Options */}
-                <div className="bg-white p-3 rounded shadow space-y-2 max-w-2xl mx-auto">
+                <div className="bg-white p-2 sm:p-3 rounded shadow space-y-2 max-w-2xl mx-auto">
                   {/* Status Info */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
@@ -491,7 +497,7 @@ const LobbyPage: React.FC = () => {
                         </p>
                       )}
 
-                      <div className="flex flex-wrap gap-4 bg-gray-50 p-3 rounded shadow min-w-max">
+                      <div className="flex flex-wrap gap-2 sm:gap-4 bg-gray-50 p-2 sm:p-3 rounded shadow">
                         <button
                           onClick={handleCopyInviteLink}
                           className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
@@ -528,7 +534,7 @@ const LobbyPage: React.FC = () => {
                   )}
 
                   {lobby.status === 'waiting' && isInThisLobby && !isHost && (
-                    <div className="flex gap-4 bg-gray-50 p-3 rounded shadow min-w-max">
+                    <div className="flex flex-wrap gap-2 sm:gap-4 bg-gray-50 p-2 sm:p-3 rounded shadow">
                       <button
                         onClick={handleCopyInviteLink}
                         className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
@@ -579,6 +585,13 @@ const LobbyPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Mobile Chat - shown at bottom on mobile, inside main content area for consistent spacing */}
+            {gameId && user && (
+              <div className="lg:hidden mt-2 sm:mt-3">
+                <ChatBox chatId={gameId} className="border border-gray-200 rounded-lg h-48" title="Lobby Chat" />
+              </div>
+            )}
           </div>
         </main>
       </div>

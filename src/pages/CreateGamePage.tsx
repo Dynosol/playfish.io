@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createLobby } from '../firebase/lobbyService';
 import { useAuth } from '../contexts/AuthContext';
+import SEO from '@/components/SEO';
 
 const CreateGamePage: React.FC = () => {
   const [lobbyName, setLobbyName] = useState('');
@@ -37,6 +38,11 @@ const CreateGamePage: React.FC = () => {
 
   return (
     <div>
+      <SEO
+        title="Create Game"
+        description="Create a new Fish card game lobby. Set up your game room, invite friends, and start playing the classic team deduction card game online."
+        canonical="/create"
+      />
       <h1>Create Lobby</h1>
       <Link to="/">Back to Home</Link>
       

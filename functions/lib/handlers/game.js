@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -285,6 +285,36 @@ exports.startDeclaration = (0, https_1.onCall)({ cors: corsOrigins }, async (req
             declarePhase: { active: true, declareeId },
             lastActivityAt: Date.now(),
             ...(shouldClearLeftPlayer && { leftPlayer: null })
+        });
+        return { success: true };
+    });
+});
+exports.abortDeclaration = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const declareeId = request.auth.uid;
+    const { gameDocId } = request.data;
+    if (!gameDocId || typeof gameDocId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'gameDocId is required');
+    }
+    await (0, rateLimiter_1.checkRateLimit)(declareeId, 'game:abortDeclaration');
+    const gameRef = db.collection('games').doc(gameDocId);
+    return await db.runTransaction(async (transaction) => {
+        const gameSnap = await transaction.get(gameRef);
+        if (!gameSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Game not found');
+        }
+        const game = { id: gameSnap.id, ...gameSnap.data() };
+        if (!game.declarePhase?.active) {
+            throw new https_1.HttpsError('failed-precondition', 'No declaration is in progress');
+        }
+        if (game.declarePhase.declareeId !== declareeId) {
+            throw new https_1.HttpsError('permission-denied', 'You are not the active declaree');
+        }
+        transaction.update(gameRef, {
+            declarePhase: null,
+            lastActivityAt: Date.now()
         });
         return { success: true };
     });

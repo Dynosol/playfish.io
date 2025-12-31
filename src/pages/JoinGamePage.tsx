@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { subscribeToActiveLobbies, joinLobby } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { useAuth } from '../contexts/AuthContext';
+import SEO from '@/components/SEO';
 
 const JoinGamePage: React.FC = () => {
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
@@ -43,6 +44,11 @@ const JoinGamePage: React.FC = () => {
 
   return (
     <div>
+      <SEO
+        title="Join Game"
+        description="Join an active Fish card game lobby. Find open games, join teams, and start playing the classic team deduction card game online."
+        canonical="/join"
+      />
       <h1>Join Lobby</h1>
       <Link to="/">Back to Home</Link>
       
