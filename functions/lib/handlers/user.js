@@ -41,7 +41,8 @@ const rateLimiter_1 = require("../rateLimiter");
 const usernameGenerator_1 = require("../utils/usernameGenerator");
 const userColors_1 = require("../utils/userColors");
 const db = admin.firestore();
-exports.createOrUpdateUser = (0, https_1.onCall)({ cors: true }, async (request) => {
+const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
+exports.createOrUpdateUser = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -75,7 +76,7 @@ exports.createOrUpdateUser = (0, https_1.onCall)({ cors: true }, async (request)
     }
     return { success: true };
 });
-exports.updateUsername = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -101,7 +102,7 @@ exports.updateUsername = (0, https_1.onCall)({ cors: true }, async (request) => 
     }, { merge: true });
     return { success: true };
 });
-exports.updateUserLastOnline = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.updateUserLastOnline = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -114,7 +115,7 @@ exports.updateUserLastOnline = (0, https_1.onCall)({ cors: true }, async (reques
     }, { merge: true });
     return { success: true };
 });
-exports.updateUserCurrentLobby = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.updateUserCurrentLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }

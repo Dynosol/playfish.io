@@ -6,6 +6,8 @@ import { createGame, archiveCompletedGameFromLobby } from './game';
 
 const db = admin.firestore();
 
+const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
+
 interface Lobby {
   id: string;
   uuid: string;
@@ -111,7 +113,7 @@ interface CreateLobbyData {
   maxPlayers: number;
 }
 
-export const createLobby = onCall({ cors: true }, async (request) => {
+export const createLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -174,7 +176,7 @@ interface JoinLobbyData {
   lobbyId: string;
 }
 
-export const joinLobby = onCall({ cors: true }, async (request) => {
+export const joinLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -228,7 +230,7 @@ interface LeaveLobbyData {
   lobbyId: string;
 }
 
-export const leaveLobby = onCall({ cors: true }, async (request) => {
+export const leaveLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -279,7 +281,7 @@ interface DeleteLobbyData {
   lobbyId: string;
 }
 
-export const deleteLobby = onCall({ cors: true }, async (request) => {
+export const deleteLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -322,7 +324,7 @@ interface JoinTeamData {
   team: 0 | 1;
 }
 
-export const joinTeam = onCall({ cors: true }, async (request) => {
+export const joinTeam = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -371,7 +373,7 @@ interface SwapPlayerTeamData {
   playerId: string;
 }
 
-export const swapPlayerTeam = onCall({ cors: true }, async (request) => {
+export const swapPlayerTeam = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -426,7 +428,7 @@ interface RandomizeTeamsData {
   lobbyId: string;
 }
 
-export const randomizeTeams = onCall({ cors: true }, async (request) => {
+export const randomizeTeams = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -484,7 +486,7 @@ interface StartLobbyData {
   lobbyId: string;
 }
 
-export const startLobby = onCall({ cors: true }, async (request) => {
+export const startLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -541,7 +543,7 @@ interface ReturnToLobbyData {
   lobbyId: string;
 }
 
-export const returnToLobby = onCall({ cors: true }, async (request) => {
+export const returnToLobby = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

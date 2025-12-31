@@ -5,12 +5,14 @@ import { checkRateLimit } from '../rateLimiter';
 
 const db = admin.firestore();
 
+const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
+
 interface SendMessageData {
   chatId: string;
   message: string;
 }
 
-export const sendMessage = onCall({ cors: true }, async (request) => {
+export const sendMessage = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

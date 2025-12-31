@@ -40,6 +40,7 @@ const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
 const db = admin.firestore();
+const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 const LEAVE_TIMEOUT_SECONDS = 60;
 const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 // Helper functions
@@ -183,7 +184,7 @@ const createGame = async (gameId, players, teamAssignments, lobbyUuid) => {
     return docRef.id;
 };
 exports.createGame = createGame;
-exports.askForCard = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.askForCard = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -249,7 +250,7 @@ exports.askForCard = (0, https_1.onCall)({ cors: true }, async (request) => {
         return { success: true };
     });
 });
-exports.startDeclaration = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.startDeclaration = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -288,7 +289,7 @@ exports.startDeclaration = (0, https_1.onCall)({ cors: true }, async (request) =
         return { success: true };
     });
 });
-exports.finishDeclaration = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.finishDeclaration = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -375,7 +376,7 @@ exports.finishDeclaration = (0, https_1.onCall)({ cors: true }, async (request) 
     }
     return { success: true };
 });
-exports.voteForReplay = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.voteForReplay = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -430,7 +431,7 @@ exports.voteForReplay = (0, https_1.onCall)({ cors: true }, async (request) => {
     }
     return { success: true, shouldReplay: false };
 });
-exports.leaveGame = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.leaveGame = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -466,7 +467,7 @@ exports.leaveGame = (0, https_1.onCall)({ cors: true }, async (request) => {
         return { success: true };
     });
 });
-exports.returnToGame = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.returnToGame = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -503,7 +504,7 @@ exports.returnToGame = (0, https_1.onCall)({ cors: true }, async (request) => {
         return { success: true };
     });
 });
-exports.forfeitGame = (0, https_1.onCall)({ cors: true }, async (request) => {
+exports.forfeitGame = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
