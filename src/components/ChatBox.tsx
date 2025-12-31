@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { getUserColorHex } from '../utils/userColors';
 import { colors } from '@/utils/colors';
-import type { Turn } from '../firebase/gameService';
+import type { Turn, Declaration } from '../firebase/gameService';
 
 const suitIcons: Record<string, string> = {
   spades: '♠',
@@ -38,11 +38,12 @@ interface ChatBoxProps {
   className?: string;
   title?: string;
   gameTurns?: Turn[];
+  declarations?: Declaration[];
   getUsername?: (playerId: string) => string;
   currentTurn?: string;
 }
 
-const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, getUsername: getUsernameProp, currentTurn }) => {
+const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, declarations, getUsername: getUsernameProp, currentTurn }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const { user } = useAuth();
@@ -71,10 +72,11 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Merge messages and game turns into a single timeline
+  // Merge messages and game events into a single timeline
   type TimelineItem =
     | { type: 'message'; data: ChatMessage }
-    | { type: 'turn'; data: Turn; nextTurnPlayer: string };
+    | { type: 'turn'; data: Turn; nextTurnPlayer: string }
+    | { type: 'declaration'; data: Declaration };
 
   // Helper to get time from Date or Firestore Timestamp
   const getTime = (ts: Date | { toDate?: () => Date; seconds?: number }): number => {
@@ -99,18 +101,27 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
       return timeA - timeB;
     });
 
-    // Add only the last game turn at the very end (if provided)
-    if (gameTurns && gameTurns.length > 0 && getUsernameProp) {
-      const lastTurn = gameTurns[gameTurns.length - 1];
-      const nextTurnPlayer = lastTurn.success
-        ? lastTurn.askerId  // If successful, same player goes again
-        : lastTurn.targetId; // If failed, target becomes the asker
+    // Add the latest game event (turn or declaration, whichever is more recent)
+    if (getUsernameProp) {
+      const lastTurn = gameTurns && gameTurns.length > 0 ? gameTurns[gameTurns.length - 1] : null;
+      const lastDeclaration = declarations && declarations.length > 0 ? declarations[declarations.length - 1] : null;
 
-      items.push({ type: 'turn', data: lastTurn, nextTurnPlayer });
+      const lastTurnTime = lastTurn ? getTime(lastTurn.timestamp) : 0;
+      const lastDeclarationTime = lastDeclaration ? getTime(lastDeclaration.timestamp) : 0;
+
+      // Show whichever is more recent
+      if (lastDeclarationTime > lastTurnTime && lastDeclaration) {
+        items.push({ type: 'declaration', data: lastDeclaration });
+      } else if (lastTurn) {
+        const nextTurnPlayer = lastTurn.success
+          ? lastTurn.askerId  // If successful, same player goes again
+          : lastTurn.targetId; // If failed, target becomes the asker
+        items.push({ type: 'turn', data: lastTurn, nextTurnPlayer });
+      }
     }
 
     return items;
-  }, [messages, gameTurns, getUsernameProp]);
+  }, [messages, gameTurns, declarations, getUsernameProp]);
 
   useEffect(() => {
     // Scroll within the chat container only, not the whole page
@@ -220,6 +231,39 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
                           {"'s turn"}
                           {turn.success && ' (again)'}
                           {'.'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (item.type === 'declaration' && getUsernameProp) {
+                    const declaration = item.data;
+                    const declareeName = getUsernameProp(declaration.declareeId);
+                    // Parse halfSuit like 'low-spades' into suit and range
+                    const [range, suit] = declaration.halfSuit.split('-') as ['low' | 'high', keyof typeof suitIcons];
+                    const isRedSuit = suit === 'hearts' || suit === 'diamonds';
+                    const suitColor = isRedSuit ? '#ef4444' : '#000000';
+                    const rangeLabel = range === 'low' ? '2-7' : '9-A';
+                    const teamLabel = declaration.team === 0 ? 'Team 1' : 'Team 2';
+
+                    return (
+                      <div key={`declaration-${getTime(declaration.timestamp)}-${index}`} className="text-center py-2 space-y-0.5">
+                        <div className="text-xs text-gray-600">
+                          <span className="font-semibold">{declareeName}</span>
+                          {' declared '}
+                          <span style={{ color: suitColor }}>{suitIcons[suit]}</span>
+                          {' '}
+                          <span className="font-semibold">{rangeLabel}</span>
+                          {' for '}
+                          <span className="font-semibold">{teamLabel}</span>
+                          {', and was '}
+                          <span
+                            className="font-bold"
+                            style={{ color: declaration.correct ? colors.green : colors.red }}
+                          >
+                            {declaration.correct ? 'CORRECT' : 'WRONG'}
+                          </span>
+                          {'!'}
                         </div>
                       </div>
                     );

@@ -2,13 +2,66 @@ import React from 'react';
 import { RotateCcw, Shuffle, ArrowDownUp } from 'lucide-react';
 import leaveIcon from '@/assets/leave.png';
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { colors } from '@/utils/colors';
-import type { Game } from '@/firebase/gameService';
+import type { Game, Card } from '@/firebase/gameService';
 import type { Lobby } from '@/firebase/lobbyService';
 import type { User } from 'firebase/auth';
+
+const suitIcons: Record<string, string> = {
+  spades: '♠',
+  hearts: '♥',
+  clubs: '♣',
+  diamonds: '♦'
+};
+
+const ALL_HALFSUITS: Card['halfSuit'][] = [
+  'low-spades', 'high-spades',
+  'low-hearts', 'high-hearts',
+  'low-clubs', 'high-clubs',
+  'low-diamonds', 'high-diamonds'
+];
+
+const HalfsuitsGrid: React.FC<{ completedHalfsuits: Card['halfSuit'][] }> = ({ completedHalfsuits }) => {
+  const suits = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
+
+  return (
+    <div className="grid grid-cols-2 gap-1">
+      {suits.map(suit => {
+        const isRed = suit === 'hearts' || suit === 'diamonds';
+        const suitColor = isRed ? '#ef4444' : '#000000';
+
+        return (['low', 'high'] as const).map(level => {
+          const halfsuit = `${level}-${suit}` as Card['halfSuit'];
+          const isCompleted = completedHalfsuits.includes(halfsuit);
+
+          return (
+            <div
+              key={halfsuit}
+              className={cn(
+                "flex items-center gap-1 px-1.5 py-1 rounded text-xs border",
+                isCompleted
+                  ? "bg-gray-100 border-gray-300"
+                  : "bg-gray-50 border-gray-200 opacity-40"
+              )}
+            >
+              <span
+                style={{ color: suitColor }}
+                className="text-sm leading-none"
+              >
+                {suitIcons[suit]}
+              </span>
+              <span className={cn("capitalize", isCompleted ? "font-medium" : "text-gray-500")}>
+                {level}
+              </span>
+            </div>
+          );
+        });
+      })}
+    </div>
+  );
+};
 
 interface GameSidebarProps {
   game: Game;
@@ -124,17 +177,7 @@ const GameSidebar: React.FC<GameSidebarProps> = ({
       {/* Completed Halfsuits Section */}
       <div className="p-3 space-y-2">
         <div className="text-sm font-semibold">Completed Halfsuits</div>
-        {game.completedHalfsuits.length === 0 ? (
-          <p className="text-xs text-muted-foreground">None yet</p>
-        ) : (
-          <div className="flex flex-wrap gap-1">
-            {game.completedHalfsuits.map(hs => (
-              <Badge key={hs} variant="secondary" className="text-xs">
-                {hs}
-              </Badge>
-            ))}
-          </div>
-        )}
+        <HalfsuitsGrid completedHalfsuits={game.completedHalfsuits} />
       </div>
 
       {/* Actions Section - at bottom */}

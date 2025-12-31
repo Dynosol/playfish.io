@@ -6,8 +6,55 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { colors } from '@/utils/colors';
-import type { Game } from '@/firebase/gameService';
+import type { Game, Card } from '@/firebase/gameService';
 import type { Lobby } from '@/firebase/lobbyService';
+
+const suitIcons: Record<string, string> = {
+  spades: '♠',
+  hearts: '♥',
+  clubs: '♣',
+  diamonds: '♦'
+};
+
+const HalfsuitsGrid: React.FC<{ completedHalfsuits: Card['halfSuit'][] }> = ({ completedHalfsuits }) => {
+  const suits = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
+
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      {suits.map(suit => {
+        const isRed = suit === 'hearts' || suit === 'diamonds';
+        const suitColor = isRed ? '#ef4444' : '#000000';
+
+        return (['low', 'high'] as const).map(level => {
+          const halfsuit = `${level}-${suit}` as Card['halfSuit'];
+          const isCompleted = completedHalfsuits.includes(halfsuit);
+
+          return (
+            <div
+              key={halfsuit}
+              className={cn(
+                "flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[10px] border",
+                isCompleted
+                  ? "bg-gray-100 border-gray-300"
+                  : "bg-gray-50 border-gray-200 opacity-40"
+              )}
+            >
+              <span className={cn(isCompleted ? "font-medium" : "text-gray-500")}>
+                {level === 'low' ? 'L' : 'H'}
+              </span>
+              <span
+                style={{ color: suitColor }}
+                className="text-xs leading-none"
+              >
+                {suitIcons[suit]}
+              </span>
+            </div>
+          );
+        });
+      })}
+    </div>
+  );
+};
 
 interface GameInfoSheetProps {
   game: Game;
@@ -111,20 +158,10 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
             )}
           </div>
 
-          {/* Completed Halfsuits */}
+          {/* Halfsuits */}
           <div>
             <div className="text-xs text-muted-foreground mb-1">Completed Halfsuits</div>
-            {game.completedHalfsuits.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">None yet</p>
-            ) : (
-              <div className="flex flex-wrap gap-1">
-                {game.completedHalfsuits.map((hs) => (
-                  <Badge key={hs} variant="secondary" className="text-[10px]">
-                    {hs}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <HalfsuitsGrid completedHalfsuits={game.completedHalfsuits} />
           </div>
 
           {/* Actions */}

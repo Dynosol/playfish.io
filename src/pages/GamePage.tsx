@@ -519,7 +519,7 @@ const GamePage: React.FC = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Sidebar - Chat (hidden on mobile) */}
         <div className="hidden lg:block w-72 shrink-0 p-3">
-          <ChatBox chatId={gameId!} className="border border-gray-200" title="Game Chat" gameTurns={game?.turns} getUsername={getUsername} currentTurn={game?.currentTurn} />
+          <ChatBox chatId={gameId!} className="border border-gray-200" title="Game Chat" gameTurns={game?.turns} declarations={game?.declarations} getUsername={getUsername} currentTurn={game?.currentTurn} />
         </div>
 
         {/* Center - Game Area */}
@@ -718,7 +718,7 @@ const GamePage: React.FC = () => {
           />
           {/* Mobile Chat */}
           <div className="p-2 border-t border-gray-200">
-            <ChatBox chatId={gameId!} className="border border-gray-200 rounded-lg h-40" title="Game Chat" gameTurns={game?.turns} getUsername={getUsername} currentTurn={game?.currentTurn} />
+            <ChatBox chatId={gameId!} className="border border-gray-200 rounded-lg h-40" title="Game Chat" gameTurns={game?.turns} declarations={game?.declarations} getUsername={getUsername} currentTurn={game?.currentTurn} />
           </div>
         </div>
       </div>

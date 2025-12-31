@@ -33,46 +33,96 @@ const GameOverCard: React.FC<GameOverCardProps> = ({
   getUsername,
   getUserColor,
 }) => {
+  const winnerContent = (
+    <>
+      <h2 className="text-xl lg:text-2xl font-bold text-center mb-3">
+        <span style={{ color: winningTeam === 0 ? '#ef4444' : '#3b82f6' }}>
+          {winningTeam === 0 ? 'RED TEAM' : 'BLUE TEAM'}
+        </span>
+        {' WINS!'}
+      </h2>
+      <div className="mb-3">
+        <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
+        <ul className="text-sm space-y-1">
+          {getTeamPlayers(game, winningTeam).map(playerId => (
+            <li key={playerId}>
+              {playerId === userId ? (
+                <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
+              ) : (
+                <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="flex gap-2">
+        {isHost ? (
+          <Button onClick={onReplay} size="sm" className="flex-1 rounded">
+            Replay {nonHostPlayersCount > 0 ? `(${replayVoteCount}/${nonHostPlayersCount})` : ''}
+          </Button>
+        ) : (
+          <Button onClick={onVoteForReplay} disabled={hasVotedForReplay} size="sm" className="flex-1 rounded">
+            {hasVotedForReplay ? 'Voted' : 'Vote Replay'}
+          </Button>
+        )}
+        <Button onClick={onReturnToLobby} variant="outline" size="sm" className="flex-1 rounded">
+          Back to Lobby
+        </Button>
+      </div>
+    </>
+  );
+
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-30 p-4">
-      <UICard className="w-full max-w-sm rounded shadow">
-        <CardHeader className="pb-2 sm:pb-4">
-          <CardTitle className="text-xl sm:text-2xl text-center">
-            {winningTeam === 0 ? 'RED TEAM' : 'BLUE TEAM'} WINS!
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4">
-          <div>
-            <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
-            <ul className="text-sm space-y-1">
-              {getTeamPlayers(game, winningTeam).map(playerId => (
-                <li key={playerId}>
-                  {playerId === userId ? (
-                    <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
-                  ) : (
-                    <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            {isHost ? (
-              <Button onClick={onReplay} size="sm" className="flex-1 rounded">
-                Replay {nonHostPlayersCount > 0 ? `(${replayVoteCount}/${nonHostPlayersCount})` : ''}
+    <>
+      {/* Mobile: Simple inline content */}
+      <div className="lg:hidden p-4">
+        {winnerContent}
+      </div>
+
+      {/* Desktop: Centered card overlay */}
+      <div className="hidden lg:flex absolute inset-0 items-center justify-center z-30 p-4">
+        <UICard className="w-full max-w-sm rounded shadow">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-2xl text-center font-bold">
+              <span style={{ color: winningTeam === 0 ? '#ef4444' : '#3b82f6' }}>
+                {winningTeam === 0 ? 'RED TEAM' : 'BLUE TEAM'}
+              </span>
+              {' WINS!'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
+              <ul className="text-sm space-y-1">
+                {getTeamPlayers(game, winningTeam).map(playerId => (
+                  <li key={playerId}>
+                    {playerId === userId ? (
+                      <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
+                    ) : (
+                      <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex gap-2">
+              {isHost ? (
+                <Button onClick={onReplay} size="sm" className="flex-1 rounded">
+                  Replay {nonHostPlayersCount > 0 ? `(${replayVoteCount}/${nonHostPlayersCount})` : ''}
+                </Button>
+              ) : (
+                <Button onClick={onVoteForReplay} disabled={hasVotedForReplay} size="sm" className="flex-1 rounded">
+                  {hasVotedForReplay ? 'Voted' : 'Vote Replay'}
+                </Button>
+              )}
+              <Button onClick={onReturnToLobby} variant="outline" size="sm" className="rounded">
+                Back to Lobby
               </Button>
-            ) : (
-              <Button onClick={onVoteForReplay} disabled={hasVotedForReplay} size="sm" className="flex-1 rounded">
-                {hasVotedForReplay ? 'Voted' : 'Vote Replay'}
-              </Button>
-            )}
-            <Button onClick={onReturnToLobby} variant="outline" size="sm" className="rounded">
-              Back to Lobby
-            </Button>
-          </div>
-        </CardContent>
-      </UICard>
-    </div>
+            </div>
+          </CardContent>
+        </UICard>
+      </div>
+    </>
   );
 };
 
