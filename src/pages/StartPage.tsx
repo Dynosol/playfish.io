@@ -167,7 +167,7 @@ const StartPage: React.FC = () => {
         style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }}
       >
         <div className="container mx-auto flex justify-center gap-6 text-sm text-muted-foreground">
-          <a href="/help" className="hover:text-foreground transition-colors">Help</a>
+          <a href="/rules" className="hover:text-foreground transition-colors">Help</a>
           <a href="/about" className="hover:text-foreground transition-colors">About</a>
         </div>
       </footer>

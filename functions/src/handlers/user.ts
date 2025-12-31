@@ -12,7 +12,7 @@ const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://loc
 // Validation constants
 export const MAX_USERNAME_LENGTH = 20;
 
-export const createOrUpdateUser = onCall({ cors: corsOrigins }, async (request) => {
+export const createOrUpdateUser = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -55,7 +55,7 @@ interface UpdateUsernameData {
   username: string;
 }
 
-export const updateUsername = onCall({ cors: corsOrigins }, async (request) => {
+export const updateUsername = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -88,7 +88,7 @@ export const updateUsername = onCall({ cors: corsOrigins }, async (request) => {
   return { success: true };
 });
 
-export const updateUserLastOnline = onCall({ cors: corsOrigins }, async (request) => {
+export const updateUserLastOnline = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -110,7 +110,7 @@ interface UpdateUserCurrentLobbyData {
   lobbyId: string | null;
 }
 
-export const updateUserCurrentLobby = onCall({ cors: corsOrigins }, async (request) => {
+export const updateUserCurrentLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

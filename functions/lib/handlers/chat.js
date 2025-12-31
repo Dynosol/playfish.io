@@ -40,7 +40,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
-exports.sendMessage = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.sendMessage = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }

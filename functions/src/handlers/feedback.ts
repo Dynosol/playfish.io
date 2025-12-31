@@ -11,7 +11,7 @@ interface SubmitFeedbackData {
   message: string;
 }
 
-export const submitFeedback = onCall({ cors: corsOrigins }, async (request) => {
+export const submitFeedback = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

@@ -12,7 +12,7 @@ interface SendMessageData {
   message: string;
 }
 
-export const sendMessage = onCall({ cors: corsOrigins }, async (request) => {
+export const sendMessage = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

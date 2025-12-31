@@ -133,7 +133,7 @@ const areTeamsEven = (lobby) => {
     const totalAssigned = team0Count + team1Count;
     return team0Count === team1Count && team0Count > 0 && totalAssigned === lobby.players.length;
 };
-exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -186,7 +186,7 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request)
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true, lobbyId };
 });
-exports.joinLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.joinLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -223,7 +223,7 @@ exports.joinLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true };
 });
-exports.leaveLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.leaveLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -261,7 +261,7 @@ exports.leaveLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) 
     await updateUserCurrentLobby(userId, null);
     return { success: true };
 });
-exports.deleteLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.deleteLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -288,7 +288,7 @@ exports.deleteLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request)
     await moveLobbyToDeleted(lobbyId, lobbyData);
     return { success: true };
 });
-exports.joinTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.joinTeam = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -323,7 +323,7 @@ exports.joinTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =>
     });
     return { success: true };
 });
-exports.leaveTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.leaveTeam = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -355,7 +355,7 @@ exports.leaveTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =
     });
     return { success: true };
 });
-exports.swapPlayerTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.swapPlayerTeam = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -395,7 +395,7 @@ exports.swapPlayerTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
     });
     return { success: true };
 });
-exports.randomizeTeams = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.randomizeTeams = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -438,7 +438,7 @@ exports.randomizeTeams = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
     });
     return { success: true };
 });
-exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -480,7 +480,7 @@ exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) 
     });
     return { success: true, gameDocId };
 });
-exports.returnToLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.returnToLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }

@@ -243,7 +243,7 @@ interface AskForCardData {
   card: Card;
 }
 
-export const askForCard = onCall({ cors: corsOrigins }, async (request) => {
+export const askForCard = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -331,7 +331,7 @@ interface StartDeclarationData {
   gameDocId: string;
 }
 
-export const startDeclaration = onCall({ cors: corsOrigins }, async (request) => {
+export const startDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -386,7 +386,7 @@ interface AbortDeclarationData {
   gameDocId: string;
 }
 
-export const abortDeclaration = onCall({ cors: corsOrigins }, async (request) => {
+export const abortDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -435,7 +435,7 @@ interface SelectDeclarationHalfSuitData {
   halfSuit: string;
 }
 
-export const selectDeclarationHalfSuit = onCall({ cors: corsOrigins }, async (request) => {
+export const selectDeclarationHalfSuit = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -490,7 +490,7 @@ interface SelectDeclarationTeamData {
   team: 0 | 1;
 }
 
-export const selectDeclarationTeam = onCall({ cors: corsOrigins }, async (request) => {
+export const selectDeclarationTeam = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -547,7 +547,7 @@ interface FinishDeclarationData {
   assignments: { [cardKey: string]: string };
 }
 
-export const finishDeclaration = onCall({ cors: corsOrigins }, async (request) => {
+export const finishDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -638,15 +638,16 @@ export const finishDeclaration = onCall({ cors: corsOrigins }, async (request) =
     return { success: true, gameOver, wasGameOver, updatedScores, gameId: game.gameId };
   });
 
-  // Update lobby historical scores if game just ended
-  if (result.gameOver && !result.wasGameOver) {
+  // Update lobby historical scores if game just ended (increment games won, not halfsuits)
+  if (result.gameOver && !result.wasGameOver && result.gameOver.winner !== null) {
     const lobbyRef = db.collection('lobbies').doc(result.gameId);
     const lobbySnap = await lobbyRef.get();
     if (lobbySnap.exists) {
       const current = lobbySnap.data()?.historicalScores || { 0: 0, 1: 0 };
-      await lobbyRef.update({
-        historicalScores: { 0: current[0] + result.updatedScores[0], 1: current[1] + result.updatedScores[1] }
-      });
+      const winningTeam = result.gameOver.winner;
+      const updatedHistorical = { ...current };
+      updatedHistorical[winningTeam]++;
+      await lobbyRef.update({ historicalScores: updatedHistorical });
     }
   }
 
@@ -657,7 +658,7 @@ interface VoteForReplayData {
   gameDocId: string;
 }
 
-export const voteForReplay = onCall({ cors: corsOrigins }, async (request) => {
+export const voteForReplay = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -736,7 +737,7 @@ interface LeaveGameData {
   gameDocId: string;
 }
 
-export const leaveGame = onCall({ cors: corsOrigins }, async (request) => {
+export const leaveGame = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -787,7 +788,7 @@ interface ReturnToGameData {
   gameDocId: string;
 }
 
-export const returnToGame = onCall({ cors: corsOrigins }, async (request) => {
+export const returnToGame = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }
@@ -840,7 +841,7 @@ interface ForfeitGameData {
   gameDocId: string;
 }
 
-export const forfeitGame = onCall({ cors: corsOrigins }, async (request) => {
+export const forfeitGame = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
   }

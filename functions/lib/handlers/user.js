@@ -44,7 +44,7 @@ const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 // Validation constants
 exports.MAX_USERNAME_LENGTH = 20;
-exports.createOrUpdateUser = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.createOrUpdateUser = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -78,7 +78,7 @@ exports.createOrUpdateUser = (0, https_1.onCall)({ cors: corsOrigins }, async (r
     }
     return { success: true };
 });
-exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -104,7 +104,7 @@ exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
     }, { merge: true });
     return { success: true };
 });
-exports.updateUserLastOnline = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.updateUserLastOnline = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
@@ -117,7 +117,7 @@ exports.updateUserLastOnline = (0, https_1.onCall)({ cors: corsOrigins }, async 
     }, { merge: true });
     return { success: true };
 });
-exports.updateUserCurrentLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+exports.updateUserCurrentLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
