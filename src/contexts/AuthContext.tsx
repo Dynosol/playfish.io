@@ -37,12 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         previousUserIdRef.current = currentUser.uid;
-        setUser(currentUser);
         try {
+          // Wait for user document creation before considering user logged in
           await createOrUpdateUser(currentUser.uid);
         } catch (error) {
           console.error('Failed to create/update user document:', error);
         }
+        setUser(currentUser);
       }
       setLoading(false);
     });

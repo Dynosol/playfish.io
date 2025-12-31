@@ -12,6 +12,7 @@ import {
   callLeaveLobby,
   callDeleteLobby,
   callJoinTeam,
+  callLeaveTeam,
   callSwapPlayerTeam,
   callRandomizeTeams,
   callStartLobby,
@@ -107,6 +108,10 @@ export const deleteLobby = async (lobbyId: string, _userId: string): Promise<voi
 
 export const joinTeam = async (lobbyId: string, _userId: string, team: 0 | 1): Promise<void> => {
   await callJoinTeam({ lobbyId, team });
+};
+
+export const leaveTeam = async (lobbyId: string): Promise<void> => {
+  await callLeaveTeam({ lobbyId });
 };
 
 export const swapPlayerTeam = async (lobbyId: string, playerId: string): Promise<void> => {

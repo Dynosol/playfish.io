@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,8 @@ interface DeclarationOverlayProps {
   onAbortDeclaration: () => void;
   getUsername: (playerId: string) => string;
   getUserColor: (playerId: string) => string;
+  /** When true, allows declaring for the opposing team (step 2 shows). Default: false */
+  allowCrossTeamDeclaration?: boolean;
 }
 
 const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
@@ -40,9 +42,20 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
   onAbortDeclaration,
   getUsername,
   getUserColor,
+  allowCrossTeamDeclaration = false,
 }) => {
   const suits = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
   const suitIcons: Record<string, string> = { spades: '♠', hearts: '♥', clubs: '♣', diamonds: '♦' };
+
+  // Auto-select user's team when cross-team declaration is disabled
+  useEffect(() => {
+    if (!allowCrossTeamDeclaration && declarationHalfSuit && declarationTeam === null && user) {
+      const userTeam = game.teams[user.uid];
+      if (userTeam !== undefined) {
+        onSelectTeam(userTeam);
+      }
+    }
+  }, [allowCrossTeamDeclaration, declarationHalfSuit, declarationTeam, user, game.teams, onSelectTeam]);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
@@ -106,8 +119,8 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
             </div>
           )}
 
-          {/* Step 2: Select Team */}
-          {declarationHalfSuit && declarationTeam === null && (
+          {/* Step 2: Select Team (only shown when cross-team declaration is enabled) */}
+          {allowCrossTeamDeclaration && declarationHalfSuit && declarationTeam === null && (
             <div>
               <h4 className="font-semibold mb-2 text-sm text-gray-700">Step 2: Select Team</h4>
               <div className="mb-3 text-xs text-gray-500">
@@ -136,10 +149,12 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
             </div>
           )}
 
-          {/* Step 3: Assign Cards */}
+          {/* Step 2/3: Assign Cards */}
           {declarationHalfSuit && declarationTeam !== null && (
             <div>
-              <h4 className="font-semibold mb-2 text-sm text-gray-700">Step 3: Assign Cards</h4>
+              <h4 className="font-semibold mb-2 text-sm text-gray-700">
+                Step {allowCrossTeamDeclaration ? '3' : '2'}: Assign Cards
+              </h4>
               <div className="mb-3 text-xs text-gray-500">
                 Declaring <span className="font-medium">{declarationHalfSuit}</span> for{' '}
                 <span className="font-medium" style={{ color: declarationTeam === 0 ? colors.red : colors.blue }}>

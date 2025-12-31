@@ -1,15 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Crown, Check, AlertCircle } from 'lucide-react';
-import swapIcon from '@/assets/swap.png';
-import leaveIcon from '@/assets/leave.png';
-import randomizeIcon from '@/assets/randomize.png';
-import copyIcon from '@/assets/copy.png';
-import trashIcon from '@/assets/trash.png';
-import playIcon from '@/assets/play.png';
+import { Crown, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SEO from '@/components/SEO';
-import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
+import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, leaveTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
 import { subscribeToUser, type UserDocument } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
@@ -17,17 +11,9 @@ import { getUserColorHex } from '../utils/userColors';
 import { colors } from '../utils/colors';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
-
-const shimmerKeyframes = `
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-`;
+import TeamPanel from '@/components/lobby/TeamPanel';
+import LobbyControls from '@/components/lobby/LobbyControls';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
@@ -84,7 +70,6 @@ const LobbyPage: React.FC = () => {
   useEffect(() => {
     if (!lobby || !gameId || !user) return;
 
-    // If the game has started and the user is in this lobby, redirect to the game
     if (lobby.status === 'playing' && lobby.players.includes(user.uid)) {
       navigate(`/game/${gameId}`);
     }
@@ -118,7 +103,6 @@ const LobbyPage: React.FC = () => {
 
     handleJoin();
   }, [user, lobby, gameId, hasJoined, userCurrentLobby]);
-
 
   const handleLeaveLobby = async () => {
     if (!user || !gameId) return;
@@ -164,6 +148,16 @@ const LobbyPage: React.FC = () => {
     }
   };
 
+  const handleLeaveTeam = async () => {
+    if (!gameId || !user) return;
+
+    try {
+      await leaveTeam(gameId);
+    } catch (error) {
+      console.error('Failed to leave team:', error);
+    }
+  };
+
   const handleSwapTeam = async (playerId: string) => {
     if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
 
@@ -206,7 +200,6 @@ const LobbyPage: React.FC = () => {
 
   const usersData = useUsers(lobby?.players || []);
 
-  // Helper to get styled username
   const getUsername = (playerId: string) => usersData.get(playerId)?.username || `Player ${playerId.slice(0, 8)}`;
   const getUserColor = (playerId: string) => getUserColorHex(usersData.get(playerId)?.color || 'slate');
 
@@ -247,35 +240,6 @@ const LobbyPage: React.FC = () => {
   const isInActiveGameElsewhere = userCurrentLobby?.status === 'playing';
   const isInThisLobby = user && lobby.players.includes(user.uid);
   const historicalScores = lobby.historicalScores || { 0: 0, 1: 0 };
-
-  const PlayerRow = ({ playerId, showSwap = false, index }: { playerId: string; showSwap?: boolean; index: number }) => {
-    const isCurrentUser = playerId === user?.uid;
-    const isPlayerHost = playerId === lobby.createdBy;
-
-    return (
-      <tr>
-        <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
-        <td className="py-2" colSpan={2}>
-          <div className="inline-flex items-center bg-white px-3 py-2 rounded shadow-sm">
-            <span className="text-base font-semibold" style={{ color: getUserColor(playerId) }}>
-              {isCurrentUser ? 'You' : getUsername(playerId)}
-            </span>
-            {isPlayerHost && (
-              <Crown className="h-3.5 w-3.5 text-yellow-400 ml-1.5" />
-            )}
-            {showSwap && isHost && !isCurrentUser && (
-              <button
-                onClick={() => handleSwapTeam(playerId)}
-                className="p-1 hover:bg-gray-100 transition-colors ml-1.5 rounded"
-              >
-                <img src={swapIcon} alt="Swap" className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </td>
-      </tr>
-    );
-  };
 
   return (
     <div className="h-screen bg-white flex flex-col overflow-hidden">
@@ -336,103 +300,68 @@ const LobbyPage: React.FC = () => {
                 {/* Teams */}
                 {lobby.status === 'waiting' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
-                    {/* Red Team */}
-                    <div className="bg-gray-50 p-3 sm:p-4 pb-4 sm:pb-6 rounded shadow">
-                      <table className="w-full">
-                        <thead>
-                          <tr style={{ borderBottom: `2px solid ${colors.red}` }}>
-                            <th className="py-2 text-left text-sm font-semibold" style={{ color: colors.red }} colSpan={2}>
-                              Red Team
-                            </th>
-                            <th className="py-2 text-right">
-                              <span style={{ backgroundColor: colors.red, color: 'white', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>{team0Players.length}/{lobby.maxPlayers / 2}</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.from({ length: Math.max(team0Players.length, lobby.maxPlayers / 2) }).map((_, index) => {
-                            const playerId = team0Players[index];
-                            return playerId ? (
-                              <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
-                            ) : (
-                              <tr key={`empty-0-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
-                                <td className="py-2 text-base text-gray-300 italic" colSpan={2}>Empty</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {user && userTeam !== 0 && isInThisLobby && (
-                        <button
-                          onClick={() => handleJoinTeam(0)}
-                          className="w-full mt-2 py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
-                          style={{ backgroundColor: colors.red }}
-                        >
-                          Join Red Team
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Blue Team */}
-                    <div className="bg-gray-50 p-3 sm:p-4 pb-4 sm:pb-6 rounded shadow">
-                      <table className="w-full">
-                        <thead>
-                          <tr style={{ borderBottom: `2px solid ${colors.blue}` }}>
-                            <th className="py-2 text-left text-sm font-semibold" style={{ color: colors.blue }} colSpan={2}>
-                              Blue Team
-                            </th>
-                            <th className="py-2 text-right">
-                              <span style={{ backgroundColor: colors.blue, color: 'white', padding: '2px 8px', borderRadius: '9999px', fontSize: '12px' }}>{team1Players.length}/{lobby.maxPlayers / 2}</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.from({ length: Math.max(team1Players.length, lobby.maxPlayers / 2) }).map((_, index) => {
-                            const playerId = team1Players[index];
-                            return playerId ? (
-                              <PlayerRow key={playerId} playerId={playerId} showSwap index={index} />
-                            ) : (
-                              <tr key={`empty-1-${index}`} className="border-b border-gray-100 last:border-b-0">
-                                <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
-                                <td className="py-2 text-base text-gray-300 italic" colSpan={2}>Empty</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {user && userTeam !== 1 && isInThisLobby && (
-                        <button
-                          onClick={() => handleJoinTeam(1)}
-                          className="w-full mt-2 py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
-                          style={{ backgroundColor: colors.blue }}
-                        >
-                          Join Blue Team
-                        </button>
-                      )}
-                    </div>
+                    <TeamPanel
+                      team={0}
+                      teamPlayers={team0Players}
+                      lobby={lobby}
+                      userId={user?.uid}
+                      userTeam={userTeam}
+                      isHost={isHost}
+                      isInThisLobby={!!isInThisLobby}
+                      onJoinTeam={handleJoinTeam}
+                      onSwapTeam={handleSwapTeam}
+                      getUsername={getUsername}
+                      getUserColor={getUserColor}
+                    />
+                    <TeamPanel
+                      team={1}
+                      teamPlayers={team1Players}
+                      lobby={lobby}
+                      userId={user?.uid}
+                      userTeam={userTeam}
+                      isHost={isHost}
+                      isInThisLobby={!!isInThisLobby}
+                      onJoinTeam={handleJoinTeam}
+                      onSwapTeam={handleSwapTeam}
+                      getUsername={getUsername}
+                      getUserColor={getUserColor}
+                    />
                   </div>
                 )}
 
                 {/* Unassigned Players */}
-                {lobby.status === 'waiting' && unassignedPlayers.length > 0 && (
+                {lobby.status === 'waiting' && (
                   <div className="p-2 border border-gray-200">
-                    <h3 className="text-xs text-gray-500 mb-1.5">Unassigned Players</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {unassignedPlayers.map(playerId => {
-                        const isCurrentUser = playerId === user?.uid;
-                        const isPlayerHost = playerId === lobby.createdBy;
-
-                        return (
-                          <div key={playerId} className="flex items-center gap-1">
-                            <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
-                              {isCurrentUser ? 'You' : getUsername(playerId)}
-                            </span>
-                            {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}
-                          </div>
-                        );
-                      })}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h3 className="text-xs text-gray-500">Unassigned Players</h3>
+                      {isInThisLobby && userTeam !== null && (
+                        <button
+                          onClick={handleLeaveTeam}
+                          className="px-2 py-0.5 text-xs border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors"
+                        >
+                          Leave Team
+                        </button>
+                      )}
                     </div>
+                    {unassignedPlayers.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {unassignedPlayers.map(playerId => {
+                          const isCurrentUser = playerId === user?.uid;
+                          const isPlayerHost = playerId === lobby.createdBy;
+
+                          return (
+                            <div key={playerId} className="flex items-center gap-1">
+                              <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
+                                {isCurrentUser ? 'You' : getUsername(playerId)}
+                              </span>
+                              {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">None</span>
+                    )}
                   </div>
                 )}
 
@@ -463,115 +392,23 @@ const LobbyPage: React.FC = () => {
                     )}
                   </div>
 
-                  {lobby.status === 'waiting' && isInThisLobby && isHost && (
-                    <>
-                      <style>{shimmerKeyframes}</style>
-                      <button
-                        onClick={handleStartLobby}
-                        disabled={!teamsEven || lobby.players.length < 2}
-                        className="w-full relative overflow-hidden flex items-center justify-center gap-2 py-2 text-sm font-medium transition-all rounded"
-                        style={{
-                          backgroundColor: teamsEven && lobby.players.length >= 2 ? colors.purple : '#e5e7eb',
-                          color: teamsEven && lobby.players.length >= 2 ? 'white' : '#9ca3af',
-                          cursor: teamsEven && lobby.players.length >= 2 ? 'pointer' : 'not-allowed'
-                        }}
-                      >
-                        {teamsEven && lobby.players.length >= 2 && (
-                          <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 35%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.15) 65%, transparent 100%)',
-                              backgroundSize: '300% 100%',
-                              animation: 'shimmer 3s linear infinite',
-                            }}
-                          />
-                        )}
-                        <img src={playIcon} alt="Play" className="h-3.5 w-3.5 relative z-10" />
-                        <span className="relative z-10">Start Game</span>
-                      </button>
-
-                      {!teamsEven && (
-                        <p className="text-xs flex items-center gap-1.5" style={{ color: colors.red }}>
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          Teams must be even to start
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap gap-2 sm:gap-4 bg-gray-50 p-2 sm:p-3 rounded shadow">
-                        <button
-                          onClick={handleCopyInviteLink}
-                          className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                        >
-                          {copied ? <Check className="h-3 w-3" /> : <img src={copyIcon} alt="Copy" className="h-3.5 w-3.5" />}
-                          {copied ? 'Copied!' : 'Copy Invite Link'}
-                        </button>
-                        <button
-                          onClick={handleRandomizeTeams}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                          style={{ color: colors.blue }}
-                        >
-                          <img src={randomizeIcon} alt="Randomize" className="h-3.5 w-3.5" />
-                          Randomize Teams
-                        </button>
-                        <button
-                          onClick={() => setShowLeaveConfirm(true)}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                          style={{ color: colors.red }}
-                        >
-                          <img src={leaveIcon} alt="Leave" className="h-3.5 w-3.5" />
-                          Leave Lobby
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                          style={{ color: colors.red }}
-                        >
-                          <img src={trashIcon} alt="Delete" className="h-3.5 w-3.5" />
-                          Delete Lobby
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {lobby.status === 'waiting' && isInThisLobby && !isHost && (
-                    <div className="flex flex-wrap gap-2 sm:gap-4 bg-gray-50 p-2 sm:p-3 rounded shadow">
-                      <button
-                        onClick={handleCopyInviteLink}
-                        className="flex items-center gap-1 text-sm text-black underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                      >
-                        {copied ? <Check className="h-3 w-3" /> : <img src={copyIcon} alt="Copy" className="h-3.5 w-3.5" />}
-                        {copied ? 'Copied!' : 'Copy Invite Link'}
-                      </button>
-                      <button
-                        onClick={() => setShowLeaveConfirm(true)}
-                        className="flex items-center gap-1 text-sm font-medium underline hover:opacity-70 transition-opacity whitespace-nowrap"
-                        style={{ color: colors.red }}
-                      >
-                        <img src={leaveIcon} alt="Leave" className="h-3.5 w-3.5" />
-                        Leave Lobby
-                      </button>
-                    </div>
-                  )}
-
-                  {lobby.status === 'playing' && isInThisLobby && (
-                    <button
-                      onClick={() => navigate(`/game/${gameId}`)}
-                      className="w-full py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
-                      style={{ backgroundColor: colors.green }}
-                    >
-                      Return to game
-                    </button>
-                  )}
-
-                  {lobby.status === 'playing' && !isInThisLobby && (
-                    <button
-                      onClick={() => navigate(`/game/${gameId}`)}
-                      style={{ backgroundColor: colors.purple, color: 'white' }}
-                      className="w-full py-2 text-sm font-medium transition-colors rounded hover:opacity-90"
-                    >
-                      Spectate game
-                    </button>
-                  )}
+                  <LobbyControls
+                    isHost={isHost}
+                    isInThisLobby={!!isInThisLobby}
+                    isWaiting={lobby.status === 'waiting'}
+                    isPlaying={lobby.status === 'playing'}
+                    teamsEven={teamsEven}
+                    playerCount={lobby.players.length}
+                    copied={copied}
+                    gameId={gameId || ''}
+                    onStartLobby={handleStartLobby}
+                    onCopyInviteLink={handleCopyInviteLink}
+                    onRandomizeTeams={handleRandomizeTeams}
+                    onLeave={() => setShowLeaveConfirm(true)}
+                    onDelete={() => setShowDeleteConfirm(true)}
+                    onNavigateToGame={() => navigate(`/game/${gameId}`)}
+                    onSpectateGame={() => navigate(`/game/${gameId}`)}
+                  />
 
                   {!isInThisLobby && lobby.status === 'waiting' && (
                     <p className="text-xs text-gray-500 text-center">
@@ -597,60 +434,30 @@ const LobbyPage: React.FC = () => {
       </div>
 
       {/* Leave Confirmation Modal */}
-      {showLeaveConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full mx-4">
-            <h2 className="text-lg font-semibold mb-2">Leave Lobby?</h2>
-            <p className="text-sm text-gray-500 mb-4">Are you sure you want to leave this lobby?</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowLeaveConfirm(false);
-                  handleLeaveLobby();
-                }}
-                className="flex-1 py-2 text-sm font-medium text-white rounded hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: colors.red }}
-              >
-                Leave
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showLeaveConfirm}
+        title="Leave Lobby?"
+        message="Are you sure you want to leave this lobby?"
+        confirmLabel="Leave"
+        onConfirm={() => {
+          setShowLeaveConfirm(false);
+          handleLeaveLobby();
+        }}
+        onCancel={() => setShowLeaveConfirm(false)}
+      />
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full mx-4">
-            <h2 className="text-lg font-semibold mb-2">Delete Lobby?</h2>
-            <p className="text-sm text-gray-500 mb-4">This will permanently delete the lobby and remove all players. This action cannot be undone.</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  handleDeleteLobby();
-                }}
-                className="flex-1 py-2 text-sm font-medium text-white rounded hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: colors.red }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        title="Delete Lobby?"
+        message="This will permanently delete the lobby and remove all players. This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          handleDeleteLobby();
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };

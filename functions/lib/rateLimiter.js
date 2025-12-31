@@ -54,6 +54,7 @@ const RATE_LIMITS = {
     'lobby:leaveLobby': { maxRequests: 10, windowMs: 60000 },
     'lobby:deleteLobby': { maxRequests: 5, windowMs: 60000 },
     'lobby:joinTeam': { maxRequests: 20, windowMs: 60000 },
+    'lobby:leaveTeam': { maxRequests: 20, windowMs: 60000 },
     'lobby:swapPlayerTeam': { maxRequests: 20, windowMs: 60000 },
     'lobby:randomizeTeams': { maxRequests: 10, windowMs: 60000 },
     'lobby:startLobby': { maxRequests: 5, windowMs: 60000 },

@@ -94,12 +94,10 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
               <div className="bg-gray-50 px-2 py-1 rounded flex items-center gap-1">
                 <span className="text-muted-foreground">Team:</span>
                 <Badge
-                  className={cn(
-                    'text-[10px] px-1 py-0 h-4 text-white border-none',
-                    game.teams[user.uid] === 0 ? 'bg-red-500' : 'bg-blue-500'
-                  )}
+                  className="text-[10px] px-1 py-0 h-4 text-white border-none"
+                  style={{ backgroundColor: game.teams[user.uid] === 0 ? '#ef4444' : '#3b82f6' }}
                 >
-                  {game.teams[user.uid] === 0 ? 'Red' : 'Blue'}
+                  {game.teams[user.uid] === 0 ? 'Red Team' : 'Blue Team'}
                 </Badge>
               </div>
             )}

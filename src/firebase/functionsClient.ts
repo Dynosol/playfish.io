@@ -74,6 +74,11 @@ export const callJoinTeam = createCallable<
   { success: boolean }
 >('joinTeam');
 
+export const callLeaveTeam = createCallable<
+  { lobbyId: string },
+  { success: boolean }
+>('leaveTeam');
+
 export const callSwapPlayerTeam = createCallable<
   { lobbyId: string; playerId: string },
   { success: boolean }
@@ -109,6 +114,16 @@ export const callAbortDeclaration = createCallable<
   { gameDocId: string },
   { success: boolean; error?: string }
 >('abortDeclaration');
+
+export const callSelectDeclarationHalfSuit = createCallable<
+  { gameDocId: string; halfSuit: string },
+  { success: boolean; error?: string }
+>('selectDeclarationHalfSuit');
+
+export const callSelectDeclarationTeam = createCallable<
+  { gameDocId: string; team: 0 | 1 },
+  { success: boolean; error?: string }
+>('selectDeclarationTeam');
 
 export const callFinishDeclaration = createCallable<
   { gameDocId: string; halfSuit: string; team: 0 | 1; assignments: { [cardKey: string]: string } },

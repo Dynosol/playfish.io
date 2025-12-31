@@ -80,14 +80,16 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
       timeZoneName: 'short'
     };
 
+    const timeStr = messageDate.toLocaleTimeString(locale, timeOptions);
+
     if (diffInHours < 24) {
-      return messageDate.toLocaleTimeString(locale, timeOptions);
+      return `Today, ${timeStr}`;
     } else {
-      return messageDate.toLocaleString(locale, {
+      const dateStr = messageDate.toLocaleDateString(locale, {
         month: 'short',
         day: 'numeric',
-        ...timeOptions
       });
+      return `${dateStr}, ${timeStr}`;
     }
   };
 

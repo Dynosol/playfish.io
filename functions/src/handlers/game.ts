@@ -52,7 +52,12 @@ interface Game {
   scores: { 0: number; 1: number };
   completedHalfsuits: string[];
   declarations: Declaration[];
-  declarePhase: { active: boolean; declareeId: string | null } | null;
+  declarePhase: {
+    active: boolean;
+    declareeId: string | null;
+    selectedHalfSuit?: string;
+    selectedTeam?: 0 | 1;
+  } | null;
   gameOver: { winner: 0 | 1 | null } | null;
   replayVotes: string[];
   leftPlayer: LeftPlayer | null;
@@ -412,9 +417,122 @@ export const abortDeclaration = onCall({ cors: corsOrigins }, async (request) =>
     if (game.declarePhase.declareeId !== declareeId) {
       throw new HttpsError('permission-denied', 'You are not the active declaree');
     }
+    if (game.declarePhase.selectedHalfSuit) {
+      throw new HttpsError('failed-precondition', 'Cannot abort after selecting a half suit');
+    }
 
     transaction.update(gameRef, {
       declarePhase: null,
+      lastActivityAt: Date.now()
+    });
+
+    return { success: true };
+  });
+});
+
+interface SelectDeclarationHalfSuitData {
+  gameDocId: string;
+  halfSuit: string;
+}
+
+export const selectDeclarationHalfSuit = onCall({ cors: corsOrigins }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const declareeId = request.auth.uid;
+  const { gameDocId, halfSuit } = request.data as SelectDeclarationHalfSuitData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+  if (!halfSuit || typeof halfSuit !== 'string') {
+    throw new HttpsError('invalid-argument', 'halfSuit is required');
+  }
+
+  await checkRateLimit(declareeId, 'game:selectDeclarationHalfSuit');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.declarePhase?.active) {
+      throw new HttpsError('failed-precondition', 'No declaration is in progress');
+    }
+    if (game.declarePhase.declareeId !== declareeId) {
+      throw new HttpsError('permission-denied', 'You are not the active declaree');
+    }
+    if (game.declarePhase.selectedHalfSuit) {
+      throw new HttpsError('failed-precondition', 'Half suit has already been selected');
+    }
+    if (game.completedHalfsuits.includes(halfSuit)) {
+      throw new HttpsError('failed-precondition', 'This halfsuit has already been completed');
+    }
+
+    transaction.update(gameRef, {
+      'declarePhase.selectedHalfSuit': halfSuit,
+      lastActivityAt: Date.now()
+    });
+
+    return { success: true };
+  });
+});
+
+interface SelectDeclarationTeamData {
+  gameDocId: string;
+  team: 0 | 1;
+}
+
+export const selectDeclarationTeam = onCall({ cors: corsOrigins }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const declareeId = request.auth.uid;
+  const { gameDocId, team } = request.data as SelectDeclarationTeamData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+  if (team !== 0 && team !== 1) {
+    throw new HttpsError('invalid-argument', 'team must be 0 or 1');
+  }
+
+  await checkRateLimit(declareeId, 'game:selectDeclarationTeam');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.declarePhase?.active) {
+      throw new HttpsError('failed-precondition', 'No declaration is in progress');
+    }
+    if (game.declarePhase.declareeId !== declareeId) {
+      throw new HttpsError('permission-denied', 'You are not the active declaree');
+    }
+    if (!game.declarePhase.selectedHalfSuit) {
+      throw new HttpsError('failed-precondition', 'Half suit must be selected first');
+    }
+    if (game.declarePhase.selectedTeam !== undefined) {
+      throw new HttpsError('failed-precondition', 'Team has already been selected');
+    }
+
+    transaction.update(gameRef, {
+      'declarePhase.selectedTeam': team,
       lastActivityAt: Date.now()
     });
 

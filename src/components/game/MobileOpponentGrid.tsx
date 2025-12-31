@@ -65,7 +65,7 @@ export const MobileOpponentGrid: React.FC<MobileOpponentGridProps> = ({
                   className="text-sm font-semibold truncate"
                   style={{ color: getUserColor(playerId) }}
                 >
-                  {getUsername(playerId)} <span className={teams[playerId] === 0 ? "text-red-500" : "text-blue-500"}>({teams[playerId] === 0 ? 'Red' : 'Blue'})</span>
+                  {getUsername(playerId)} <span style={{ color: teams[playerId] === 0 ? '#ef4444' : '#3b82f6' }}>({teams[playerId] === 0 ? 'Red Team' : 'Blue Team'})</span>
                 </span>
               </div>
               <div className="text-xs text-muted-foreground">

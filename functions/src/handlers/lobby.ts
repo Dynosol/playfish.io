@@ -3,6 +3,8 @@ import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { checkRateLimit } from '../rateLimiter';
 import { createGame, archiveCompletedGameFromLobby } from './game';
+import { generateUsername } from '../utils/usernameGenerator';
+import { getRandomUserColor } from '../utils/userColors';
 
 const db = admin.firestore();
 
@@ -35,10 +37,25 @@ const generateLobbyId = (): string => {
 
 const updateUserCurrentLobby = async (uid: string, lobbyId: string | null): Promise<void> => {
   const userRef = db.collection('users').doc(uid);
-  await userRef.set({
-    currentLobbyId: lobbyId,
-    updatedAt: FieldValue.serverTimestamp()
-  }, { merge: true });
+  const userSnap = await userRef.get();
+
+  // If user document doesn't exist or is missing username, create a proper one
+  if (!userSnap.exists || !userSnap.data()?.username) {
+    await userRef.set({
+      uid,
+      username: generateUsername(),
+      color: getRandomUserColor(),
+      currentLobbyId: lobbyId,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      lastOnline: FieldValue.serverTimestamp()
+    }, { merge: true });
+  } else {
+    await userRef.set({
+      currentLobbyId: lobbyId,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+  }
 };
 
 const moveLobbyToDeleted = async (lobbyId: string, lobbyData: Lobby): Promise<void> => {
@@ -362,6 +379,51 @@ export const joinTeam = onCall({ cors: corsOrigins }, async (request) => {
 
     transaction.update(lobbyRef, {
       teams: { ...lobbyData.teams, [userId]: team }
+    });
+  });
+
+  return { success: true };
+});
+
+interface LeaveTeamData {
+  lobbyId: string;
+}
+
+export const leaveTeam = onCall({ cors: corsOrigins }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const userId = request.auth.uid;
+  const { lobbyId } = request.data as LeaveTeamData;
+
+  if (!lobbyId || typeof lobbyId !== 'string') {
+    throw new HttpsError('invalid-argument', 'lobbyId is required');
+  }
+
+  // Check rate limit
+  await checkRateLimit(userId, 'lobby:leaveTeam');
+
+  const lobbyRef = db.collection('lobbies').doc(lobbyId);
+
+  await db.runTransaction(async (transaction) => {
+    const lobbySnap = await transaction.get(lobbyRef);
+
+    if (!lobbySnap.exists) {
+      throw new HttpsError('not-found', 'Lobby not found');
+    }
+
+    const lobbyData = lobbySnap.data() as Lobby;
+
+    if (!lobbyData.players.includes(userId)) {
+      throw new HttpsError('permission-denied', 'User is not in this lobby');
+    }
+    if (lobbyData.status !== 'waiting') {
+      throw new HttpsError('failed-precondition', 'Lobby is not accepting team changes');
+    }
+
+    transaction.update(lobbyRef, {
+      teams: { ...lobbyData.teams, [userId]: null }
     });
   });
 

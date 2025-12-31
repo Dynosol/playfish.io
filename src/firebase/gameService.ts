@@ -8,6 +8,8 @@ import {
   callAskForCard,
   callStartDeclaration,
   callAbortDeclaration,
+  callSelectDeclarationHalfSuit,
+  callSelectDeclarationTeam,
   callFinishDeclaration,
   callVoteForReplay,
   callLeaveGame,
@@ -42,6 +44,8 @@ export interface Declaration {
 export interface DeclarePhase {
   active: boolean;
   declareeId: string | null;
+  selectedHalfSuit?: Card['halfSuit'];
+  selectedTeam?: 0 | 1;
 }
 
 export interface LeftPlayer {
@@ -205,6 +209,30 @@ export const abortDeclaration = async (
     return await callAbortDeclaration({ gameDocId });
   } catch (error) {
     console.error('Error in abortDeclaration:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const selectDeclarationHalfSuit = async (
+  gameDocId: string,
+  halfSuit: Card['halfSuit']
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callSelectDeclarationHalfSuit({ gameDocId, halfSuit });
+  } catch (error) {
+    console.error('Error in selectDeclarationHalfSuit:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const selectDeclarationTeam = async (
+  gameDocId: string,
+  team: 0 | 1
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callSelectDeclarationTeam({ gameDocId, team });
+  } catch (error) {
+    console.error('Error in selectDeclarationTeam:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

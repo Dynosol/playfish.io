@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -312,8 +312,89 @@ exports.abortDeclaration = (0, https_1.onCall)({ cors: corsOrigins }, async (req
         if (game.declarePhase.declareeId !== declareeId) {
             throw new https_1.HttpsError('permission-denied', 'You are not the active declaree');
         }
+        if (game.declarePhase.selectedHalfSuit) {
+            throw new https_1.HttpsError('failed-precondition', 'Cannot abort after selecting a half suit');
+        }
         transaction.update(gameRef, {
             declarePhase: null,
+            lastActivityAt: Date.now()
+        });
+        return { success: true };
+    });
+});
+exports.selectDeclarationHalfSuit = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const declareeId = request.auth.uid;
+    const { gameDocId, halfSuit } = request.data;
+    if (!gameDocId || typeof gameDocId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'gameDocId is required');
+    }
+    if (!halfSuit || typeof halfSuit !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'halfSuit is required');
+    }
+    await (0, rateLimiter_1.checkRateLimit)(declareeId, 'game:selectDeclarationHalfSuit');
+    const gameRef = db.collection('games').doc(gameDocId);
+    return await db.runTransaction(async (transaction) => {
+        const gameSnap = await transaction.get(gameRef);
+        if (!gameSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Game not found');
+        }
+        const game = { id: gameSnap.id, ...gameSnap.data() };
+        if (!game.declarePhase?.active) {
+            throw new https_1.HttpsError('failed-precondition', 'No declaration is in progress');
+        }
+        if (game.declarePhase.declareeId !== declareeId) {
+            throw new https_1.HttpsError('permission-denied', 'You are not the active declaree');
+        }
+        if (game.declarePhase.selectedHalfSuit) {
+            throw new https_1.HttpsError('failed-precondition', 'Half suit has already been selected');
+        }
+        if (game.completedHalfsuits.includes(halfSuit)) {
+            throw new https_1.HttpsError('failed-precondition', 'This halfsuit has already been completed');
+        }
+        transaction.update(gameRef, {
+            'declarePhase.selectedHalfSuit': halfSuit,
+            lastActivityAt: Date.now()
+        });
+        return { success: true };
+    });
+});
+exports.selectDeclarationTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const declareeId = request.auth.uid;
+    const { gameDocId, team } = request.data;
+    if (!gameDocId || typeof gameDocId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'gameDocId is required');
+    }
+    if (team !== 0 && team !== 1) {
+        throw new https_1.HttpsError('invalid-argument', 'team must be 0 or 1');
+    }
+    await (0, rateLimiter_1.checkRateLimit)(declareeId, 'game:selectDeclarationTeam');
+    const gameRef = db.collection('games').doc(gameDocId);
+    return await db.runTransaction(async (transaction) => {
+        const gameSnap = await transaction.get(gameRef);
+        if (!gameSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Game not found');
+        }
+        const game = { id: gameSnap.id, ...gameSnap.data() };
+        if (!game.declarePhase?.active) {
+            throw new https_1.HttpsError('failed-precondition', 'No declaration is in progress');
+        }
+        if (game.declarePhase.declareeId !== declareeId) {
+            throw new https_1.HttpsError('permission-denied', 'You are not the active declaree');
+        }
+        if (!game.declarePhase.selectedHalfSuit) {
+            throw new https_1.HttpsError('failed-precondition', 'Half suit must be selected first');
+        }
+        if (game.declarePhase.selectedTeam !== undefined) {
+            throw new https_1.HttpsError('failed-precondition', 'Team has already been selected');
+        }
+        transaction.update(gameRef, {
+            'declarePhase.selectedTeam': team,
             lastActivityAt: Date.now()
         });
         return { success: true };

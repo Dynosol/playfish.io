@@ -33,12 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = void 0;
+exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
 const game_1 = require("./game");
+const usernameGenerator_1 = require("../utils/usernameGenerator");
+const userColors_1 = require("../utils/userColors");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 // Word lists for lobby ID generation
@@ -52,10 +54,25 @@ const generateLobbyId = () => {
 };
 const updateUserCurrentLobby = async (uid, lobbyId) => {
     const userRef = db.collection('users').doc(uid);
-    await userRef.set({
-        currentLobbyId: lobbyId,
-        updatedAt: firestore_1.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const userSnap = await userRef.get();
+    // If user document doesn't exist or is missing username, create a proper one
+    if (!userSnap.exists || !userSnap.data()?.username) {
+        await userRef.set({
+            uid,
+            username: (0, usernameGenerator_1.generateUsername)(),
+            color: (0, userColors_1.getRandomUserColor)(),
+            currentLobbyId: lobbyId,
+            createdAt: firestore_1.FieldValue.serverTimestamp(),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            lastOnline: firestore_1.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+    else {
+        await userRef.set({
+            currentLobbyId: lobbyId,
+            updatedAt: firestore_1.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
 };
 const moveLobbyToDeleted = async (lobbyId, lobbyData) => {
     const deletedLobbyRef = db.collection('deletedLobbies').doc(lobbyId);
@@ -288,6 +305,36 @@ exports.joinTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =>
         }
         transaction.update(lobbyRef, {
             teams: { ...lobbyData.teams, [userId]: team }
+        });
+    });
+    return { success: true };
+});
+exports.leaveTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const userId = request.auth.uid;
+    const { lobbyId } = request.data;
+    if (!lobbyId || typeof lobbyId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'lobbyId is required');
+    }
+    // Check rate limit
+    await (0, rateLimiter_1.checkRateLimit)(userId, 'lobby:leaveTeam');
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    await db.runTransaction(async (transaction) => {
+        const lobbySnap = await transaction.get(lobbyRef);
+        if (!lobbySnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Lobby not found');
+        }
+        const lobbyData = lobbySnap.data();
+        if (!lobbyData.players.includes(userId)) {
+            throw new https_1.HttpsError('permission-denied', 'User is not in this lobby');
+        }
+        if (lobbyData.status !== 'waiting') {
+            throw new https_1.HttpsError('failed-precondition', 'Lobby is not accepting team changes');
+        }
+        transaction.update(lobbyRef, {
+            teams: { ...lobbyData.teams, [userId]: null }
         });
     });
     return { success: true };
