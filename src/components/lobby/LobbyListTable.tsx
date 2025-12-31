@@ -3,10 +3,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { colors } from '@/utils/colors';
 import type { Lobby } from '@/firebase/lobbyService';
 import type { Game } from '@/firebase/gameService';
 import type { User } from 'firebase/auth';
+
+const formatCreatedDate = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) return 'Unknown';
+
+  const locale = navigator.language || 'en-US';
+  return date.toLocaleString(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
 
 interface LobbyListTableProps {
   lobbies: Lobby[];
@@ -46,6 +60,7 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
             No active lobbies found. Create one to get started!
           </div>
         ) : (
+          <TooltipProvider delayDuration={300}>
           <Table className="min-w-[500px]">
             <TableHeader>
               <TableRow className="h-8 text-xs sm:text-sm">
@@ -70,7 +85,9 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                     : null;
 
                 return (
-                  <TableRow key={lobby.id} className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
+                  <Tooltip key={lobby.id}>
+                    <TooltipTrigger asChild>
+                    <TableRow className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
                     <TableCell className="py-1 font-medium whitespace-nowrap">{lobby.name}</TableCell>
                     <TableCell className="py-1 whitespace-nowrap">
                       <span className="font-semibold" style={{ color: getHostColor(lobby.createdBy) }}>
@@ -81,7 +98,14 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                       {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                     </TableCell>
                     <TableCell className="py-1 whitespace-nowrap">
-                      {lobby.status === 'waiting' ? (
+                      {lobby.stale && lobby.status === 'waiting' ? (
+                        <Badge
+                          className="font-normal text-white"
+                          style={{ backgroundColor: colors.grayMedium }}
+                        >
+                          Stale
+                        </Badge>
+                      ) : lobby.status === 'waiting' ? (
                         <Badge
                           className="font-normal text-white"
                           style={{ backgroundColor: colors.purple }}
@@ -142,10 +166,16 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                       )}
                     </TableCell>
                   </TableRow>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>Created: {formatCreatedDate(lobby.createdAt)}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 );
               })}
             </TableBody>
           </Table>
+          </TooltipProvider>
         )}
       </CardContent>
     </Card>

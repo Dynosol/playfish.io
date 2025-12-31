@@ -2,10 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Crown, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentSession } from '../contexts/CurrentSessionContext';
 import SEO from '@/components/SEO';
 import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, leaveTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
 import type { Lobby } from '../firebase/lobbyService';
-import { subscribeToUser, type UserDocument } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
 import { colors } from '../utils/colors';
@@ -17,18 +17,18 @@ import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 const LobbyPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>();
+  const { user } = useAuth();
+  const { currentLobby: userCurrentLobby } = useCurrentSession();
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasJoined, setHasJoined] = useState(false);
-  const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
-  const [userCurrentLobby, setUserCurrentLobby] = useState<Lobby | null>(null);
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isLeavingRef = useRef(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
 
+  // Subscribe to the lobby being viewed (from URL param)
   useEffect(() => {
     if (!gameId) return;
 
@@ -43,28 +43,8 @@ const LobbyPage: React.FC = () => {
     };
   }, [gameId]);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const unsubscribe = subscribeToUser(user.uid, (userData) => {
-      setUserDoc(userData);
-    });
-
-    return unsubscribe;
-  }, [user]);
-
-  useEffect(() => {
-    if (!userDoc?.currentLobbyId || userDoc.currentLobbyId === gameId) {
-      setUserCurrentLobby(null);
-      return;
-    }
-
-    const unsubscribe = subscribeToLobby(userDoc.currentLobbyId, (lobbyData) => {
-      setUserCurrentLobby(lobbyData);
-    });
-
-    return unsubscribe;
-  }, [userDoc?.currentLobbyId, gameId]);
+  // If user is viewing a different lobby than their current one, userCurrentLobby comes from context
+  // (only show warnings if userCurrentLobby.id !== gameId)
 
   // Auto-redirect to game when lobby status changes to 'playing'
   useEffect(() => {
@@ -83,8 +63,8 @@ const LobbyPage: React.FC = () => {
       return;
     }
 
-    // Don't auto-join if user is already in another lobby or game
-    if (userCurrentLobby) {
+    // Don't auto-join if user is already in a DIFFERENT lobby or game
+    if (userCurrentLobby && userCurrentLobby.id !== gameId) {
       return;
     }
 
@@ -237,7 +217,8 @@ const LobbyPage: React.FC = () => {
   const teamsEven = areTeamsEven(lobby);
   const isHost = lobby.createdBy === user?.uid;
   const userTeam = user ? lobby.teams[user.uid] : null;
-  const isInActiveGameElsewhere = userCurrentLobby?.status === 'playing';
+  // Only show "in active game elsewhere" if user's current lobby is playing AND it's a different lobby
+  const isInActiveGameElsewhere = userCurrentLobby?.status === 'playing' && userCurrentLobby?.id !== gameId;
   const isInThisLobby = user && lobby.players.includes(user.uid);
   const historicalScores = lobby.historicalScores || { 0: 0, 1: 0 };
 
@@ -379,16 +360,24 @@ const LobbyPage: React.FC = () => {
                   {/* Status Info */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
-                    {(lobby.status === 'playing' || lobby.players.length < 2 || !teamsEven) && (
+                    {(lobby.stale || lobby.status === 'playing' || lobby.players.length < 2 || !teamsEven) && (
                       <div
                         className="px-3 py-1 text-xs font-normal rounded-full text-white"
-                        style={{ backgroundColor: lobby.status === 'waiting' ? colors.purple : '#f59e0b' }}
+                        style={{
+                          backgroundColor: lobby.stale && lobby.status === 'waiting'
+                            ? colors.grayMedium
+                            : lobby.status === 'waiting'
+                              ? colors.purple
+                              : '#f59e0b'
+                        }}
                       >
-                        {lobby.status === 'waiting'
-                          ? (lobby.players.length >= 2 && !teamsEven
-                              ? 'Teams must be balanced to start'
-                              : 'Waiting for more players')
-                          : 'In Progress'}
+                        {lobby.stale && lobby.status === 'waiting'
+                          ? 'Stale'
+                          : lobby.status === 'waiting'
+                            ? (lobby.players.length >= 2 && !teamsEven
+                                ? 'Teams must be balanced to start'
+                                : 'Waiting for more players')
+                            : 'In Progress'}
                       </div>
                     )}
                   </div>
@@ -413,11 +402,11 @@ const LobbyPage: React.FC = () => {
 
                   {!isInThisLobby && lobby.status === 'waiting' && (
                     <p className="text-xs text-gray-500 text-center">
-                      {userCurrentLobby?.status === 'playing'
-                        ? 'You must leave your current game before joining another'
-                        : userCurrentLobby
-                          ? 'You must leave your current lobby before joining another'
-                          : 'You are spectating this lobby'}
+                      {userCurrentLobby && userCurrentLobby.id !== gameId
+                        ? (userCurrentLobby.status === 'playing'
+                            ? 'You must leave your current game before joining another'
+                            : 'You must leave your current lobby before joining another')
+                        : 'You are spectating this lobby'}
                     </p>
                   )}
                 </div>

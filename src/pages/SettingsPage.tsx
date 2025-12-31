@@ -1,32 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { subscribeToUser, updateUsername } from '../firebase/userService';
-import type { UserDocument } from '../firebase/userService';
+import { useUserDocument } from '../contexts/UserDocumentContext';
+import { updateUsername } from '../firebase/userService';
 import { colors } from '../utils/colors';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
-  const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
+  const { userDoc } = useUserDocument();
   const [editingUsername, setEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync local state with userDoc from context
   useEffect(() => {
-    if (!user) return;
-
-    const unsubscribe = subscribeToUser(user.uid, (userData) => {
-      setUserDoc(userData);
-      if (userData && !editingUsername) {
-        setNewUsername(userData.username);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [user, editingUsername]);
+    if (userDoc && !editingUsername) {
+      setNewUsername(userDoc.username);
+    }
+  }, [userDoc, editingUsername]);
 
   const handleEditUsername = () => {
     setEditingUsername(true);

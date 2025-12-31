@@ -2,15 +2,13 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../contexts/AuthContext';
+import { useCurrentSession } from '../contexts/CurrentSessionContext';
 import SEO from '@/components/SEO';
-import { subscribeToUser } from '../firebase/userService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
-import { subscribeToLobby, subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
-import { subscribeToGame, returnToGame } from '../firebase/gameService';
-import type { UserDocument } from '../firebase/userService';
+import { subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
+import { returnToGame } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
-import type { Game } from '../firebase/gameService';
 
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
@@ -19,9 +17,7 @@ import CreateLobbyForm from '@/components/lobby/CreateLobbyForm';
 
 const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
-  const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
-  const [currentLobby, setCurrentLobby] = useState<Lobby | null>(null);
-  const [currentGame, setCurrentGame] = useState<Game | null>(null);
+  const { currentLobby, currentGame } = useCurrentSession();
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [loadingLobbies, setLoadingLobbies] = useState(true);
   const [joining, setJoining] = useState<string | null>(null);
@@ -34,43 +30,7 @@ const StartPage: React.FC = () => {
   const getHostUsername = (hostId: string) => hostUsersData.get(hostId)?.username || '...';
   const getHostColor = (hostId: string) => getUserColorHex(hostUsersData.get(hostId)?.color || 'slate');
 
-  useEffect(() => {
-    if (!user) return;
-
-    const unsubscribe = subscribeToUser(user.uid, (userData) => {
-      setUserDoc(userData);
-    });
-
-    return unsubscribe;
-  }, [user]);
-
-  useEffect(() => {
-    if (!userDoc?.currentLobbyId) {
-      setCurrentLobby(null);
-      return;
-    }
-
-    const unsubscribe = subscribeToLobby(userDoc.currentLobbyId, (lobby) => {
-      setCurrentLobby(lobby);
-    });
-
-    return unsubscribe;
-  }, [userDoc?.currentLobbyId]);
-
-  // Subscribe to current game to check if user has left
-  useEffect(() => {
-    if (!currentLobby?.onGoingGame) {
-      setCurrentGame(null);
-      return;
-    }
-
-    const unsubscribe = subscribeToGame(currentLobby.onGoingGame, (game) => {
-      setCurrentGame(game);
-    });
-
-    return unsubscribe;
-  }, [currentLobby?.onGoingGame]);
-
+  // Subscribe to active lobbies list (this is different from currentLobby - it lists all lobbies)
   useEffect(() => {
     if (!user) {
       setLobbies([]);
@@ -146,7 +106,7 @@ const StartPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
       <SEO
         title="Play Fish Online"
         description="Play Fish online - the classic 6-player team card game of deduction and strategy. Create or join a game, form teams, and compete in real-time multiplayer matches. Not Go Fish!"
@@ -194,12 +154,23 @@ const StartPage: React.FC = () => {
             </div>
 
             {/* Mobile Chat - shown at bottom on mobile, inside main content area for consistent spacing */}
-            <div className="lg:hidden mt-2 sm:mt-3">
+            <div className="lg:hidden mt-2 sm:mt-3 pb-14">
               <ChatBox chatId="global" className="border border-gray-200 rounded-lg h-48" title="Global Chat" />
             </div>
           </div>
         </main>
       </div>
+
+      {/* Footer - fixed to bottom of viewport */}
+      <footer
+        className="border-t border-gray-200 bg-background py-3 px-4"
+        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }}
+      >
+        <div className="container mx-auto flex justify-center gap-6 text-sm text-muted-foreground">
+          <a href="/help" className="hover:text-foreground transition-colors">Help</a>
+          <a href="/about" className="hover:text-foreground transition-colors">About</a>
+        </div>
+      </footer>
     </div>
   );
 };

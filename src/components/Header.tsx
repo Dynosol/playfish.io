@@ -10,9 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from '../contexts/AuthContext';
+import { useUserDocument } from '../contexts/UserDocumentContext';
 import { colors } from '../utils/colors';
-import { subscribeToUser, updateUsername } from '../firebase/userService';
-import type { UserDocument } from '../firebase/userService';
+import { updateUsername } from '../firebase/userService';
 import { cn } from "@/lib/utils";
 import playfishLogo from '@/assets/playfish.png';
 import fishIcon from '@/assets/favicon.png';
@@ -30,7 +30,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [userData, setUserData] = useState<UserDocument | null>(null);
+  const { userDoc } = useUserDocument();
   const [isEditing, setIsEditing] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,17 +39,13 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
 
+  // Sync local state with userDoc from context
   useEffect(() => {
-    if (!user) return;
-    const unsubscribe = subscribeToUser(user.uid, (data) => {
-        setUserData(data);
-        if (data?.username) {
-          setNewUsername(data.username);
-          setSettingsUsername(data.username);
-        }
-    });
-    return unsubscribe;
-  }, [user]);
+    if (userDoc?.username) {
+      setNewUsername(userDoc.username);
+      setSettingsUsername(userDoc.username);
+    }
+  }, [userDoc?.username]);
 
   const handleSaveUsername = async () => {
       if (!user || !newUsername.trim()) return;
@@ -123,13 +119,13 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                             "border-b bg-transparent outline-none text-lg font-medium w-32",
                             newUsername.trim().length > MAX_USERNAME_LENGTH ? "border-red-500" : "border-gray-400"
                           )}
-                          style={{ color: getUserColorHex(userData?.color || 'slate') }}
+                          style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
                           maxLength={MAX_USERNAME_LENGTH + 5}
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && newUsername.trim().length <= MAX_USERNAME_LENGTH) handleSaveUsername();
                             if (e.key === 'Escape') {
-                              setNewUsername(userData?.username || '');
+                              setNewUsername(userDoc?.username || '');
                               setIsEditing(false);
                             }
                           }}
@@ -137,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                             if (newUsername.trim().length <= MAX_USERNAME_LENGTH) {
                               handleSaveUsername();
                             } else {
-                              setNewUsername(userData?.username || '');
+                              setNewUsername(userDoc?.username || '');
                               setIsEditing(false);
                             }
                           }}
@@ -153,16 +149,16 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                   <>
                     <span
                       className="underline decoration-1 underline-offset-2"
-                      style={{ color: getUserColorHex(userData?.color || 'slate') }}
+                      style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
                     >
-                      {userData?.username || 'StarUnicorn'}
+                      {userDoc?.username || 'StarUnicorn'}
                     </span>
                     <Button
                       size="icon"
                       variant="ghost"
                       className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       onClick={() => {
-                        setNewUsername(userData?.username || '');
+                        setNewUsername(userDoc?.username || '');
                         setIsEditing(true);
                       }}
                     >

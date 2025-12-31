@@ -25,7 +25,8 @@ export {
   swapPlayerTeam,
   randomizeTeams,
   startLobby,
-  returnToLobby
+  returnToLobby,
+  checkInactiveLobbies
 } from './handlers/lobby';
 
 export {

@@ -3,9 +3,17 @@ import {
   query,
   where,
   onSnapshot,
-  doc
+  doc,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from './config';
+
+// Helper to convert Firestore Timestamp to Date
+const toDate = (timestamp: Timestamp | Date | undefined): Date => {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Timestamp) return timestamp.toDate();
+  return timestamp;
+};
 import {
   callCreateLobby,
   callJoinLobby,
@@ -31,6 +39,8 @@ export interface Lobby {
   createdAt: Date;
   onGoingGame: string | null;
   historicalScores: { 0: number; 1: number };
+  lastActivityAt?: number; // timestamp of last action (for inactivity detection)
+  stale?: boolean; // whether the lobby is stale due to inactivity
 }
 
 export interface CreateLobbyData {
@@ -51,10 +61,14 @@ export const subscribeToActiveLobbies = (
     lobbiesQuery,
     (snapshot) => {
       console.log('Received lobbies snapshot:', snapshot.docs.length, 'lobbies');
-      const lobbiesList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Lobby));
+      const lobbiesList = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: toDate(data.createdAt)
+        } as Lobby;
+      });
       console.log('Lobbies list:', lobbiesList);
       callback(lobbiesList);
     },
@@ -73,7 +87,12 @@ export const subscribeToLobby = (
   return onSnapshot(doc(db, 'lobbies', lobbyId), (docSnapshot) => {
     console.log('Received lobby snapshot for', lobbyId, ':', docSnapshot.exists());
     if (docSnapshot.exists()) {
-      const lobbyData = { id: docSnapshot.id, ...docSnapshot.data() } as Lobby;
+      const data = docSnapshot.data();
+      const lobbyData = {
+        id: docSnapshot.id,
+        ...data,
+        createdAt: toDate(data.createdAt)
+      } as Lobby;
       console.log('Lobby data:', lobbyData);
       callback(lobbyData);
     } else {

@@ -33,8 +33,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.MAX_LOBBY_NAME_LENGTH = void 0;
+exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.MAX_LOBBY_NAME_LENGTH = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
@@ -178,7 +179,9 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request)
         status: 'waiting',
         onGoingGame: null,
         historicalScores: { 0: 0, 1: 0 },
-        createdAt: firestore_1.FieldValue.serverTimestamp()
+        createdAt: firestore_1.FieldValue.serverTimestamp(),
+        lastActivityAt: Date.now(),
+        stale: false
     });
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true, lobbyId };
@@ -213,7 +216,9 @@ exports.joinLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =
     const updatedTeams = { ...lobbyData.teams, [userId]: null };
     await lobbyRef.update({
         players: firestore_1.FieldValue.arrayUnion(userId),
-        teams: updatedTeams
+        teams: updatedTeams,
+        lastActivityAt: Date.now(),
+        stale: false
     });
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true };
@@ -243,7 +248,9 @@ exports.leaveLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) 
             delete updatedTeams[userId];
             const updateData = {
                 players: firestore_1.FieldValue.arrayRemove(userId),
-                teams: updatedTeams
+                teams: updatedTeams,
+                lastActivityAt: Date.now(),
+                stale: false
             };
             if (isHost && updatedPlayers.length > 0) {
                 updateData.createdBy = updatedPlayers[0];
@@ -309,7 +316,9 @@ exports.joinTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =>
             throw new https_1.HttpsError('failed-precondition', 'Lobby is not accepting team changes');
         }
         transaction.update(lobbyRef, {
-            teams: { ...lobbyData.teams, [userId]: team }
+            teams: { ...lobbyData.teams, [userId]: team },
+            lastActivityAt: Date.now(),
+            stale: false
         });
     });
     return { success: true };
@@ -339,7 +348,9 @@ exports.leaveTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (request) =
             throw new https_1.HttpsError('failed-precondition', 'Lobby is not accepting team changes');
         }
         transaction.update(lobbyRef, {
-            teams: { ...lobbyData.teams, [userId]: null }
+            teams: { ...lobbyData.teams, [userId]: null },
+            lastActivityAt: Date.now(),
+            stale: false
         });
     });
     return { success: true };
@@ -377,7 +388,9 @@ exports.swapPlayerTeam = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
             throw new https_1.HttpsError('failed-precondition', 'Player must be assigned to a team before swapping');
         }
         transaction.update(lobbyRef, {
-            teams: { ...lobbyData.teams, [playerId]: currentTeam === 0 ? 1 : 0 }
+            teams: { ...lobbyData.teams, [playerId]: currentTeam === 0 ? 1 : 0 },
+            lastActivityAt: Date.now(),
+            stale: false
         });
     });
     return { success: true };
@@ -417,7 +430,11 @@ exports.randomizeTeams = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
         shuffledPlayers.forEach((player, i) => {
             newTeams[player] = i < teamSize ? 0 : 1;
         });
-        transaction.update(lobbyRef, { teams: newTeams });
+        transaction.update(lobbyRef, {
+            teams: newTeams,
+            lastActivityAt: Date.now(),
+            stale: false
+        });
     });
     return { success: true };
 });
@@ -457,7 +474,9 @@ exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request) 
     await lobbyRef.update({
         status: 'playing',
         onGoingGame: gameDocId,
-        historicalScores: lobbyData.historicalScores || { 0: 0, 1: 0 }
+        historicalScores: lobbyData.historicalScores || { 0: 0, 1: 0 },
+        lastActivityAt: Date.now(),
+        stale: false
     });
     return { success: true, gameDocId };
 });
@@ -484,7 +503,12 @@ exports.returnToLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (reques
             throw new https_1.HttpsError('permission-denied', 'You are not in this lobby');
         }
         const onGoingGame = lobbyData.onGoingGame;
-        transaction.update(lobbyRef, { status: 'waiting', onGoingGame: null });
+        transaction.update(lobbyRef, {
+            status: 'waiting',
+            onGoingGame: null,
+            lastActivityAt: Date.now(),
+            stale: false
+        });
         return onGoingGame;
     });
     // Archive the completed game if one exists
@@ -492,5 +516,26 @@ exports.returnToLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (reques
         await (0, game_1.archiveCompletedGameFromLobby)(gameDocId);
     }
     return { success: true };
+});
+// Scheduled function to check for stale lobbies
+// Runs every 5 minutes to mark lobbies as stale if inactive for 30 minutes
+const LOBBY_STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+exports.checkInactiveLobbies = (0, scheduler_1.onSchedule)('every 5 minutes', async () => {
+    const now = Date.now();
+    const staleThreshold = now - LOBBY_STALE_THRESHOLD_MS;
+    // Find waiting lobbies that haven't been marked stale yet
+    const lobbiesSnapshot = await db.collection('lobbies')
+        .where('status', '==', 'waiting')
+        .where('stale', '!=', true)
+        .get();
+    for (const lobbyDoc of lobbiesSnapshot.docs) {
+        const lobby = lobbyDoc.data();
+        const lastActivity = lobby.lastActivityAt ||
+            lobby.createdAt?._seconds * 1000;
+        if (lastActivity && lastActivity <= staleThreshold) {
+            await lobbyDoc.ref.update({ stale: true });
+            console.log(`Lobby ${lobbyDoc.id} marked as stale`);
+        }
+    }
 });
 //# sourceMappingURL=lobby.js.map

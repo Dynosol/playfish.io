@@ -16,13 +16,6 @@ const suitIcons: Record<string, string> = {
   diamonds: '♦'
 };
 
-const ALL_HALFSUITS: Card['halfSuit'][] = [
-  'low-spades', 'high-spades',
-  'low-hearts', 'high-hearts',
-  'low-clubs', 'high-clubs',
-  'low-diamonds', 'high-diamonds'
-];
-
 const HalfsuitsGrid: React.FC<{ completedHalfsuits: Card['halfSuit'][] }> = ({ completedHalfsuits }) => {
   const suits = ['spades', 'hearts', 'clubs', 'diamonds'] as const;
 

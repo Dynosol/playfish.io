@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { sendMessage, subscribeToMessages, GLOBAL_CHAT_ID, type ChatMessage } from '../firebase/chatService';
+import { useChatContext } from '../contexts/ChatContext';
+import { sendMessage, GLOBAL_CHAT_ID, type ChatMessage } from '../firebase/chatService';
 import { useUsername, useUsers } from '../hooks/useUsername';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,13 +44,27 @@ interface ChatBoxProps {
   currentTurn?: string;
 }
 
-const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, declarations, getUsername: getUsernameProp, currentTurn }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, declarations, getUsername: getUsernameProp, currentTurn: _currentTurn }) => {
   const [inputMessage, setInputMessage] = useState('');
   const { user } = useAuth();
+  const { getMessages, subscribe, unsubscribe } = useChatContext();
   const username = useUsername(user?.uid);
 
   const isGlobalChat = chatId === GLOBAL_CHAT_ID;
+
+  // Subscribe/unsubscribe via ChatContext (reference counted - multiple instances share one subscription)
+  useEffect(() => {
+    if (!chatId) return;
+
+    subscribe(chatId, isGlobalChat);
+
+    return () => {
+      unsubscribe(chatId);
+    };
+  }, [chatId, isGlobalChat, subscribe, unsubscribe]);
+
+  // Get messages from context
+  const messages = getMessages(chatId);
 
   // Get unique user IDs from messages to fetch their colors
   const messageUserIds = useMemo(() =>
@@ -57,18 +72,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
     [messages]
   );
   const usersData = useUsers(messageUserIds);
-
-  useEffect(() => {
-    if (!chatId) return;
-
-    const unsubscribe = subscribeToMessages(chatId, (newMessages) => {
-      setMessages(newMessages);
-    }, isGlobalChat ? { maxAgeHours: 24 } : {});
-
-    return () => {
-      unsubscribe();
-    };
-  }, [chatId, isGlobalChat]);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -194,7 +197,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
             <div className="space-y-0.5">
               {timeline.length === 0 ? (
                 <div className="text-center text-xs text-muted-foreground mt-4">
-                  No messages yet.
+                  {isGlobalChat ? 'No messages found in the last 24 hours.\nStart the conversation!' : 'No messages yet.'}
                 </div>
               ) : (
                 timeline.map((item, index) => {

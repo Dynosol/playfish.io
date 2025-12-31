@@ -2,12 +2,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { subscribeToUser } from '../firebase/userService';
-import { subscribeToLobby } from '../firebase/lobbyService';
-import { subscribeToGame, returnToGame, LEAVE_TIMEOUT_SECONDS } from '../firebase/gameService';
-import type { UserDocument } from '../firebase/userService';
-import type { Lobby } from '../firebase/lobbyService';
-import type { Game } from '../firebase/gameService';
+import { useCurrentSession } from '../contexts/CurrentSessionContext';
+import { returnToGame, LEAVE_TIMEOUT_SECONDS } from '../firebase/gameService';
 
 const shimmerKeyframes = `
 @keyframes shimmer {
@@ -22,50 +18,11 @@ const shimmerKeyframes = `
 
 const ActiveGameBanner: React.FC = () => {
   const { user } = useAuth();
+  const { currentLobby, currentGame } = useCurrentSession();
   const location = useLocation();
   const navigate = useNavigate();
-  const [userDoc, setUserDoc] = useState<UserDocument | null>(null);
-  const [currentLobby, setCurrentLobby] = useState<Lobby | null>(null);
-  const [currentGame, setCurrentGame] = useState<Game | null>(null);
   const [leaveCountdown, setLeaveCountdown] = useState<number | null>(null);
   const [isReturning, setIsReturning] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const unsubscribe = subscribeToUser(user.uid, (userData) => {
-      setUserDoc(userData);
-    });
-
-    return unsubscribe;
-  }, [user]);
-
-  useEffect(() => {
-    if (!userDoc?.currentLobbyId) {
-      setCurrentLobby(null);
-      return;
-    }
-
-    const unsubscribe = subscribeToLobby(userDoc.currentLobbyId, (lobby) => {
-      setCurrentLobby(lobby);
-    });
-
-    return unsubscribe;
-  }, [userDoc?.currentLobbyId]);
-
-  // Subscribe to the current game to check if user has left
-  useEffect(() => {
-    if (!currentLobby?.onGoingGame) {
-      setCurrentGame(null);
-      return;
-    }
-
-    const unsubscribe = subscribeToGame(currentLobby.onGoingGame, (game) => {
-      setCurrentGame(game);
-    });
-
-    return unsubscribe;
-  }, [currentLobby?.onGoingGame]);
 
   // Check if user has left the game
   const hasUserLeft = currentGame?.leftPlayer?.odId === user?.uid;

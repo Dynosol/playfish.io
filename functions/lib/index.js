@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.submitFeedback = exports.sendMessage = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.submitFeedback = exports.sendMessage = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -58,6 +58,7 @@ Object.defineProperty(exports, "swapPlayerTeam", { enumerable: true, get: functi
 Object.defineProperty(exports, "randomizeTeams", { enumerable: true, get: function () { return lobby_1.randomizeTeams; } });
 Object.defineProperty(exports, "startLobby", { enumerable: true, get: function () { return lobby_1.startLobby; } });
 Object.defineProperty(exports, "returnToLobby", { enumerable: true, get: function () { return lobby_1.returnToLobby; } });
+Object.defineProperty(exports, "checkInactiveLobbies", { enumerable: true, get: function () { return lobby_1.checkInactiveLobbies; } });
 var game_1 = require("./handlers/game");
 Object.defineProperty(exports, "askForCard", { enumerable: true, get: function () { return game_1.askForCard; } });
 Object.defineProperty(exports, "startDeclaration", { enumerable: true, get: function () { return game_1.startDeclaration; } });
