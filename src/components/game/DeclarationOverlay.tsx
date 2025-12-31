@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import CardImage from '../CardImage';
 import type { Card } from '@/firebase/gameService';
@@ -49,17 +48,17 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
 
   // Auto-select user's team when cross-team declaration is disabled
   useEffect(() => {
-    if (!allowCrossTeamDeclaration && declarationHalfSuit && declarationTeam === null && user) {
+    if (!allowCrossTeamDeclaration && declarationHalfSuit && declarationTeam === null && user && !isDeclaring) {
       const userTeam = game.teams[user.uid];
       if (userTeam !== undefined) {
         onSelectTeam(userTeam);
       }
     }
-  }, [allowCrossTeamDeclaration, declarationHalfSuit, declarationTeam, user, game.teams, onSelectTeam]);
+  }, [allowCrossTeamDeclaration, declarationHalfSuit, declarationTeam, user, game.teams, onSelectTeam, isDeclaring]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-      <div className="w-96 max-h-[70vh] bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
+      <div className="w-96 max-h-[85vh] bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gray-700 px-4 py-3 flex items-center justify-between">
           <h2 className="text-white font-semibold">DECLARATION</h2>
@@ -161,7 +160,7 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
                   {declarationTeam === 0 ? 'Red' : 'Blue'} Team
                 </span>
               </div>
-              <div className="space-y-2 max-h-52 overflow-y-auto">
+              <div className="space-y-1.5 max-h-80 overflow-y-auto">
                 {getAllCardsInHalfSuit(declarationHalfSuit).map(card => {
                   const cardKey = getCardKey(card);
                   const assignedPlayerId = declarationAssignments[cardKey];
@@ -170,23 +169,26 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
                   return (
                     <div key={cardKey} className="flex items-center gap-2">
                       <CardImage card={card} width={32} height={45} />
-                      <Select
-                        value={assignedPlayerId || ''}
-                        onValueChange={(value) => onAssignCard(cardKey, value)}
-                      >
-                        <SelectTrigger className="h-8 text-xs flex-1">
-                          <SelectValue placeholder="Select player..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {teamPlayers.map(playerId => (
-                            <SelectItem key={playerId} value={playerId} className="text-xs">
-                              <span className="font-medium" style={{ color: getUserColor(playerId) }}>
-                                {playerId === user?.uid ? 'You' : getUsername(playerId)}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex-1 flex gap-1">
+                        {teamPlayers.map(playerId => {
+                          const isSelected = assignedPlayerId === playerId;
+                          return (
+                            <button
+                              key={playerId}
+                              onClick={() => onAssignCard(cardKey, playerId)}
+                              className={cn(
+                                "flex-1 px-2 py-1 text-xs font-medium rounded border transition-all",
+                                isSelected
+                                  ? "border-transparent text-white"
+                                  : "border-gray-300 bg-white hover:bg-gray-50"
+                              )}
+                              style={isSelected ? { backgroundColor: getUserColor(playerId) } : { color: getUserColor(playerId) }}
+                            >
+                              {playerId === user?.uid ? 'You' : getUsername(playerId)}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}

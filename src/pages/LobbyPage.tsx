@@ -287,7 +287,7 @@ const LobbyPage: React.FC = () => {
               <div className="space-y-2 sm:space-y-3">
                 {/* Lobby Header - Centered */}
                 <div className="text-center pb-2 sm:pb-3 border-b border-gray-200 bg-white p-3 sm:p-4 rounded shadow">
-                  <h1 className="text-xl sm:text-2xl font-semibold">{lobby.name}</h1>
+                  <h1 className="text-xl sm:text-2xl"><span className="font-normal">Lobby name: </span><span className="font-semibold">{lobby.name}</span></h1>
                   {(historicalScores[0] > 0 || historicalScores[1] > 0) && (
                     <div className="mt-2 inline-block bg-white px-4 py-2 rounded shadow-sm text-2xl font-bold">
                       Score: <span style={{ color: colors.red }}>{historicalScores[0]}</span>
@@ -332,36 +332,37 @@ const LobbyPage: React.FC = () => {
                 {/* Unassigned Players */}
                 {lobby.status === 'waiting' && (
                   <div className="p-2 border border-gray-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h3 className="text-xs text-gray-500">Unassigned Players</h3>
+                    <h3 className="text-xs text-gray-500 mb-1.5">Unassigned Players</h3>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-wrap gap-2 flex-1">
+                        {unassignedPlayers.length > 0 ? (
+                          unassignedPlayers.map(playerId => {
+                            const isCurrentUser = playerId === user?.uid;
+                            const isPlayerHost = playerId === lobby.createdBy;
+
+                            return (
+                              <div key={playerId} className="flex items-center gap-1">
+                                <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
+                                  {isCurrentUser ? 'You' : getUsername(playerId)}
+                                </span>
+                                {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">None</span>
+                        )}
+                      </div>
                       {isInThisLobby && userTeam !== null && (
                         <button
                           onClick={handleLeaveTeam}
-                          className="px-2 py-0.5 text-xs border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors"
+                          className="px-4 py-2 text-sm text-white font-medium transition-colors rounded hover:opacity-90"
+                          style={{ backgroundColor: colors.grayMedium }}
                         >
                           Leave Team
                         </button>
                       )}
                     </div>
-                    {unassignedPlayers.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {unassignedPlayers.map(playerId => {
-                          const isCurrentUser = playerId === user?.uid;
-                          const isPlayerHost = playerId === lobby.createdBy;
-
-                          return (
-                            <div key={playerId} className="flex items-center gap-1">
-                              <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
-                                {isCurrentUser ? 'You' : getUsername(playerId)}
-                              </span>
-                              {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-400 italic">None</span>
-                    )}
                   </div>
                 )}
 

@@ -10,6 +10,9 @@ const db = admin.firestore();
 
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 
+// Validation constants
+export const MAX_LOBBY_NAME_LENGTH = 30;
+
 interface Lobby {
   id: string;
   uuid: string;
@@ -141,6 +144,9 @@ export const createLobby = onCall({ cors: corsOrigins }, async (request) => {
   // Validate input
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     throw new HttpsError('invalid-argument', 'Lobby name is required');
+  }
+  if (name.trim().length > MAX_LOBBY_NAME_LENGTH) {
+    throw new HttpsError('invalid-argument', `Lobby name must be ${MAX_LOBBY_NAME_LENGTH} characters or less`);
   }
   if (!maxPlayers || typeof maxPlayers !== 'number' || maxPlayers < 2 || maxPlayers > 6) {
     throw new HttpsError('invalid-argument', 'maxPlayers must be between 2 and 6');

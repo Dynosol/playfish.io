@@ -1,5 +1,5 @@
 import React from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Shuffle, ArrowDownUp } from 'lucide-react';
 import leaveIcon from '@/assets/leave.png';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,10 @@ interface GameSidebarProps {
   onLeaveGame: () => void;
   onReturnToLobby: () => void;
   onDeclare: () => void;
+  onAsk: () => void;
+  onShuffle?: () => void;
+  onSort?: () => void;
+  sortToast?: { message: string; visible: boolean };
 }
 
 const GameSidebar: React.FC<GameSidebarProps> = ({
@@ -44,6 +48,10 @@ const GameSidebar: React.FC<GameSidebarProps> = ({
   onLeaveGame,
   onReturnToLobby,
   onDeclare,
+  onAsk,
+  onShuffle,
+  onSort,
+  sortToast,
 }) => {
   return (
     <div className="bg-white rounded shadow">
@@ -140,6 +148,7 @@ const GameSidebar: React.FC<GameSidebarProps> = ({
                 <TooltipTrigger asChild>
                   <div className="w-full">
                     <Button
+                      onClick={onAsk}
                       disabled={!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer}
                       className={cn(
                         "w-full rounded font-semibold transition-all relative",
@@ -191,6 +200,41 @@ const GameSidebar: React.FC<GameSidebarProps> = ({
             </TooltipProvider>
             {declareError && (
               <div className="text-xs text-destructive text-center">{declareError}</div>
+            )}
+            {/* Card Organization - Shuffle & Sort */}
+            {onShuffle && onSort && (
+              <div className="relative pt-2">
+                {sortToast && (
+                  <div className={cn(
+                    "absolute -top-1 left-0 right-0 text-center bg-black/80 text-white text-xs px-2 py-1 rounded-full transition-opacity duration-200 pointer-events-none -translate-y-full",
+                    sortToast.visible ? "opacity-100" : "opacity-0"
+                  )}>
+                    {sortToast.message}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 h-8 bg-white border border-gray-200 hover:bg-gray-50"
+                    onClick={onSort}
+                    title="Sort cards"
+                  >
+                    <ArrowDownUp className="h-4 w-4 mr-1" />
+                    Sort
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 h-8 bg-white border border-gray-200 hover:bg-gray-50"
+                    onClick={onShuffle}
+                    title="Shuffle cards"
+                  >
+                    <Shuffle className="h-4 w-4 mr-1" />
+                    Shuffle
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </>

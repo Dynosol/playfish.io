@@ -149,3 +149,9 @@ export const callForfeitGame = createCallable<
   { gameDocId: string },
   { success: boolean; error?: string }
 >('forfeitGame');
+
+// Feedback functions
+export const callSubmitFeedback = createCallable<
+  { message: string },
+  { success: boolean }
+>('submitFeedback');

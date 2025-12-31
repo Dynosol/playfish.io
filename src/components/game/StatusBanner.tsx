@@ -57,6 +57,7 @@ interface TurnBannerProps {
   isInDeclarePhase: boolean;
   getUsername: (playerId: string) => string;
   getUserColor: (playerId: string) => string;
+  onAskClick?: () => void;
 }
 
 export const TurnBanner: React.FC<TurnBannerProps> = ({
@@ -65,6 +66,7 @@ export const TurnBanner: React.FC<TurnBannerProps> = ({
   isInDeclarePhase,
   getUsername,
   getUserColor,
+  onAskClick,
 }) => {
   const backgroundColor = isInDeclarePhase
     ? '#6b7280'
@@ -73,10 +75,21 @@ export const TurnBanner: React.FC<TurnBannerProps> = ({
   return (
     <StatusBanner backgroundColor={backgroundColor} showShimmer={!isInDeclarePhase || isMyTurn}>
       {isMyTurn ? (
-        <>
+        <span className="inline-flex items-center gap-2">
           <span className="font-semibold">It's your turn!</span>
-          {!isInDeclarePhase && ' Click on an opponent to ask for a card.'}
-        </>
+          {!isInDeclarePhase && onAskClick && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAskClick();
+              }}
+              className="ml-2 px-3 py-0.5 bg-white/20 hover:bg-white/30 rounded text-white font-medium transition-colors"
+            >
+              Ask for a card
+            </button>
+          )}
+        </span>
       ) : (
         <>It's <span className="font-semibold">{getUsername(currentTurnPlayerId)}</span>'s turn...</>
       )}

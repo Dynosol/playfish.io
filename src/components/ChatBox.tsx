@@ -6,6 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getUserColorHex } from '../utils/userColors';
+import { colors } from '@/utils/colors';
+import type { Turn } from '../firebase/gameService';
+
+const suitIcons: Record<string, string> = {
+  spades: '♠',
+  hearts: '♥',
+  clubs: '♣',
+  diamonds: '♦'
+};
 
 const scrollbarStyles = `
   .chat-scrollbar::-webkit-scrollbar {
@@ -28,9 +37,12 @@ interface ChatBoxProps {
   chatId: string;
   className?: string;
   title?: string;
+  gameTurns?: Turn[];
+  getUsername?: (playerId: string) => string;
+  currentTurn?: string;
 }
 
-const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
+const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, getUsername: getUsernameProp, currentTurn }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const { user } = useAuth();
@@ -59,12 +71,53 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Merge messages and game turns into a single timeline
+  type TimelineItem =
+    | { type: 'message'; data: ChatMessage }
+    | { type: 'turn'; data: Turn; nextTurnPlayer: string };
+
+  // Helper to get time from Date or Firestore Timestamp
+  const getTime = (ts: Date | { toDate?: () => Date; seconds?: number }): number => {
+    if (ts instanceof Date) return ts.getTime();
+    if (typeof ts?.toDate === 'function') return ts.toDate().getTime();
+    if (typeof ts?.seconds === 'number') return ts.seconds * 1000;
+    return 0;
+  };
+
+  const timeline = useMemo(() => {
+    const items: TimelineItem[] = [];
+
+    // Add messages
+    messages.forEach(msg => {
+      items.push({ type: 'message', data: msg });
+    });
+
+    // Sort messages by timestamp
+    items.sort((a, b) => {
+      const timeA = getTime(a.data.timestamp);
+      const timeB = getTime(b.data.timestamp);
+      return timeA - timeB;
+    });
+
+    // Add only the last game turn at the very end (if provided)
+    if (gameTurns && gameTurns.length > 0 && getUsernameProp) {
+      const lastTurn = gameTurns[gameTurns.length - 1];
+      const nextTurnPlayer = lastTurn.success
+        ? lastTurn.askerId  // If successful, same player goes again
+        : lastTurn.targetId; // If failed, target becomes the asker
+
+      items.push({ type: 'turn', data: lastTurn, nextTurnPlayer });
+    }
+
+    return items;
+  }, [messages, gameTurns, getUsernameProp]);
+
   useEffect(() => {
     // Scroll within the chat container only, not the whole page
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [timeline]);
 
   const formatTimestamp = (timestamp: Date): string => {
     const now = new Date();
@@ -128,15 +181,55 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title }) => {
         >
           <TooltipProvider delayDuration={200}>
             <div className="space-y-0.5">
-              {messages.length === 0 ? (
+              {timeline.length === 0 ? (
                 <div className="text-center text-xs text-muted-foreground mt-4">
                   No messages yet.
                 </div>
               ) : (
-                messages.map((msg, index) => {
+                timeline.map((item, index) => {
+                  if (item.type === 'turn' && getUsernameProp) {
+                    const turn = item.data;
+                    const isRedSuit = turn.card.suit === 'hearts' || turn.card.suit === 'diamonds';
+                    const suitColor = isRedSuit ? '#ef4444' : '#000000';
+                    const askerName = getUsernameProp(turn.askerId);
+                    const targetName = getUsernameProp(turn.targetId);
+                    const nextPlayerName = getUsernameProp(item.nextTurnPlayer);
+
+                    return (
+                      <div key={`turn-${getTime(turn.timestamp)}-${index}`} className="text-center py-2 space-y-0.5">
+                        <div className="text-xs text-gray-600">
+                          <span className="font-semibold">{askerName}</span>
+                          {' asked '}
+                          <span className="font-semibold">{targetName}</span>
+                          {' for the '}
+                          <span className="font-semibold">{turn.card.rank}</span>
+                          {' of '}
+                          <span style={{ color: suitColor }}>{suitIcons[turn.card.suit]}</span>
+                          {', and was '}
+                          <span
+                            className="font-bold"
+                            style={{ color: turn.success ? colors.purple : colors.red }}
+                          >
+                            {turn.success ? 'RIGHT' : 'WRONG'}
+                          </span>
+                          {'.'}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {"It is now "}
+                          <span className="font-semibold">{nextPlayerName}</span>
+                          {"'s turn"}
+                          {turn.success && ' (again)'}
+                          {'.'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Regular chat message
+                  const msg = item.data as ChatMessage;
                   const isCurrentUser = msg.userId === user?.uid;
-                  const prevMsg = index > 0 ? messages[index - 1] : null;
-                  const showName = !prevMsg || prevMsg.userId !== msg.userId;
+                  const prevItem = index > 0 ? timeline[index - 1] : null;
+                  const showName = !prevItem || prevItem.type !== 'message' || (prevItem.data as ChatMessage).userId !== msg.userId;
                   return (
                     <div
                       key={msg.id}

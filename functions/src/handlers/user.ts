@@ -9,6 +9,9 @@ const db = admin.firestore();
 
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 
+// Validation constants
+export const MAX_USERNAME_LENGTH = 20;
+
 export const createOrUpdateUser = onCall({ cors: corsOrigins }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be authenticated');
@@ -69,8 +72,8 @@ export const updateUsername = onCall({ cors: corsOrigins }, async (request) => {
   if (trimmedUsername.length === 0) {
     throw new HttpsError('invalid-argument', 'Username cannot be empty');
   }
-  if (trimmedUsername.length > 50) {
-    throw new HttpsError('invalid-argument', 'Username must be 50 characters or less');
+  if (trimmedUsername.length > MAX_USERNAME_LENGTH) {
+    throw new HttpsError('invalid-argument', `Username must be ${MAX_USERNAME_LENGTH} characters or less`);
   }
 
   // Check rate limit

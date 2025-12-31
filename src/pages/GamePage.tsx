@@ -38,8 +38,9 @@ import GameInfoSheet from '../components/game/GameInfoSheet';
 import DeclarationOverlay from '../components/game/DeclarationOverlay';
 import GameOverCard from '../components/game/GameOverCard';
 import GameSidebar from '../components/game/GameSidebar';
-import PlayerHand from '../components/game/PlayerHand';
+import PlayerHand, { MobilePlayerHand } from '../components/game/PlayerHand';
 import AskCardDialog from '../components/game/AskCardDialog';
+import SelectOpponentDialog from '../components/game/SelectOpponentDialog';
 import DesktopOpponentLayout from '../components/game/DesktopOpponentLayout';
 import { TurnBanner, DeclarationBanner, LeftPlayerBanner } from '../components/game/StatusBanner';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
@@ -58,6 +59,7 @@ const GamePage: React.FC = () => {
   const navigate = useNavigate();
   const { isDesktop } = useBreakpoint();
 
+  const [showSelectOpponent, setShowSelectOpponent] = useState(false);
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const [selectedSuit, setSelectedSuit] = useState<Card['suit']>('spades');
   const [selectedRank, setSelectedRank] = useState<Card['rank']>('A');
@@ -499,6 +501,7 @@ const GamePage: React.FC = () => {
               isInDeclarePhase={isInDeclarePhase}
               getUsername={getUsername}
               getUserColor={getUserColor}
+              onAskClick={() => setShowSelectOpponent(true)}
             />
           )}
 
@@ -516,7 +519,7 @@ const GamePage: React.FC = () => {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Sidebar - Chat (hidden on mobile) */}
         <div className="hidden lg:block w-72 shrink-0 p-3">
-          <ChatBox chatId={gameId!} className="border border-gray-200" title="Game Chat" />
+          <ChatBox chatId={gameId!} className="border border-gray-200" title="Game Chat" gameTurns={game?.turns} getUsername={getUsername} currentTurn={game?.currentTurn} />
         </div>
 
         {/* Center - Game Area */}
@@ -553,6 +556,7 @@ const GamePage: React.FC = () => {
                     onSelectOpponent={setSelectedOpponent}
                     getUsername={getUsername}
                     getUserColor={getUserColor}
+                    userId={user?.uid}
                   />
                 </div>
               ) : (
@@ -561,6 +565,7 @@ const GamePage: React.FC = () => {
                   allOtherPlayers={allOtherPlayers}
                   opponents={opponents}
                   game={game}
+                  userId={user?.uid}
                   isMyTurn={isMyTurn}
                   isInDeclarePhase={isInDeclarePhase}
                   onSelectOpponent={setSelectedOpponent}
@@ -601,23 +606,21 @@ const GamePage: React.FC = () => {
                   canAsk={canAskForCard()}
                   isAsking={isAsking}
                   errorMessage={errorMessage}
+                  playerHand={playerHand}
                 />
               )}
             </>
           )}
 
-          {isPlayer && playerHand.length > 0 && (
+          {/* Desktop only: Fan layout player hand */}
+          {isDesktop && isPlayer && playerHand.length > 0 && (
             <PlayerHand
               playerHand={playerHand}
               cardDimensions={cardDimensions}
               responsiveFactor={responsiveFactor}
-              isMyTurn={isMyTurn}
               isDesktop={isDesktop}
               dragState={dragState}
-              toast={toast}
               onDragStart={handleDragStart}
-              onShuffle={handleShuffle}
-              onSort={handleSort}
             />
           )}
 
@@ -677,11 +680,21 @@ const GamePage: React.FC = () => {
             onLeaveGame={() => setShowLeaveConfirm(true)}
             onReturnToLobby={handleReturnToLobby}
             onDeclare={handleDeclare}
+            onAsk={() => setShowSelectOpponent(true)}
+            onShuffle={handleShuffle}
+            onSort={handleSort}
+            sortToast={toast}
           />
         </div>
 
-        {/* Mobile: Game Info and Chat at bottom */}
+        {/* Mobile: Player Hand, Game Info and Chat at bottom */}
         <div className="lg:hidden flex flex-col shrink-0">
+          {/* Mobile Player Hand */}
+          {isPlayer && playerHand.length > 0 && (
+            <div className="border-t border-gray-200 bg-gray-50">
+              <MobilePlayerHand playerHand={playerHand} />
+            </div>
+          )}
           {/* Mobile Game Info */}
           <GameInfoSheet
             game={game}
@@ -697,14 +710,34 @@ const GamePage: React.FC = () => {
             onLeaveGame={() => setShowLeaveConfirm(true)}
             onReturnToLobby={handleReturnToLobby}
             onDeclare={handleDeclare}
+            onAsk={() => setShowSelectOpponent(true)}
             isPlayerAlive={isPlayerAlive(game, user?.uid || '')}
+            onShuffle={handleShuffle}
+            onSort={handleSort}
+            sortToast={toast}
           />
           {/* Mobile Chat */}
           <div className="p-2 border-t border-gray-200">
-            <ChatBox chatId={gameId!} className="border border-gray-200 rounded-lg h-40" title="Game Chat" />
+            <ChatBox chatId={gameId!} className="border border-gray-200 rounded-lg h-40" title="Game Chat" gameTurns={game?.turns} getUsername={getUsername} currentTurn={game?.currentTurn} />
           </div>
         </div>
       </div>
+
+      {/* Select Opponent Dialog */}
+      {game && isMyTurn && !isInDeclarePhase && showSelectOpponent && !selectedOpponent && (
+        <SelectOpponentDialog
+          opponents={opponents}
+          teams={game.teams}
+          playerHands={game.playerHands}
+          onSelectOpponent={(playerId) => {
+            setSelectedOpponent(playerId);
+            setShowSelectOpponent(false);
+          }}
+          onCancel={() => setShowSelectOpponent(false)}
+          getUsername={getUsername}
+          getUserColor={getUserColor}
+        />
+      )}
 
       {/* Leave Confirmation Modal */}
       <ConfirmationModal

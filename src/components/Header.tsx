@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Check, X, User } from 'lucide-react';
 import pencilIcon from '@/assets/pencil.png';
 import questionIcon from '@/assets/questionmark.png';
@@ -8,13 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from '../contexts/AuthContext';
+import { colors } from '../utils/colors';
 import { subscribeToUser, updateUsername } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
 import { cn } from "@/lib/utils";
 import playfishLogo from '@/assets/playfish.png';
 import fishIcon from '@/assets/favicon.png';
 import { getUserColorHex } from '../utils/userColors';
+
+// Must match cloud function MAX_USERNAME_LENGTH
+const MAX_USERNAME_LENGTH = 20;
 
 interface HeaderProps {
   type: 'home' | 'game';
@@ -89,33 +94,61 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
             onClick={handleHomeClick}
           >
             <img src={fishIcon} alt="Fish" className="h-6 w-6 sm:h-8 sm:w-8" />
-            <img src={playfishLogo} alt="playfish.io" className="h-8 sm:h-10 hidden xs:block sm:block" />
+            <img src={playfishLogo} alt="playfish.io" className="h-8 sm:h-10 hidden sm:block" />
           </div>
 
-          {/* Center: Dynamic Content - hidden on mobile */}
-          <div className="hidden sm:flex absolute left-1/2 -translate-x-1/2 items-center justify-center">
+          {/* Center: Dynamic Content */}
+          <div className="flex absolute left-1/2 -translate-x-1/2 items-center justify-center">
+            {/* Mobile: Show logo centered */}
+            <img
+              src={playfishLogo}
+              alt="playfish.io"
+              className="h-8 sm:hidden cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleHomeClick}
+            />
+            {/* Desktop: Show dynamic content */}
             {type === 'game' ? (
-              <span className="font-medium text-base sm:text-lg">Game Room: {roomName}</span>
+              <span className="hidden sm:block font-medium text-base sm:text-lg">Game Room: {roomName}</span>
             ) : (
-              <div className="flex items-center gap-2 font-medium text-lg">
+              <div className="hidden sm:flex items-center gap-2 font-medium text-lg">
                 <span>Welcome,{' '}</span>
                 {isEditing ? (
-                  <input
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    className="border-b border-gray-400 bg-transparent outline-none text-lg font-medium w-32"
-                    style={{ color: getUserColorHex(userData?.color || 'slate') }}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveUsername();
-                      if (e.key === 'Escape') {
-                        setNewUsername(userData?.username || '');
-                        setIsEditing(false);
-                      }
-                    }}
-                    onBlur={handleSaveUsername}
-                    disabled={loading}
-                  />
+                  <TooltipProvider>
+                    <Tooltip open={newUsername.trim().length > MAX_USERNAME_LENGTH}>
+                      <TooltipTrigger asChild>
+                        <input
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          className={cn(
+                            "border-b bg-transparent outline-none text-lg font-medium w-32",
+                            newUsername.trim().length > MAX_USERNAME_LENGTH ? "border-red-500" : "border-gray-400"
+                          )}
+                          style={{ color: getUserColorHex(userData?.color || 'slate') }}
+                          maxLength={MAX_USERNAME_LENGTH + 5}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newUsername.trim().length <= MAX_USERNAME_LENGTH) handleSaveUsername();
+                            if (e.key === 'Escape') {
+                              setNewUsername(userData?.username || '');
+                              setIsEditing(false);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (newUsername.trim().length <= MAX_USERNAME_LENGTH) {
+                              handleSaveUsername();
+                            } else {
+                              setNewUsername(userData?.username || '');
+                              setIsEditing(false);
+                            }
+                          }}
+                          disabled={loading}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="bg-red-500 text-white">
+                        <p>Choose a shorter name!</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ) : (
                   <>
                     <span
@@ -170,9 +203,9 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
 
       {/* Settings Popup */}
       {showSettings && (
-        <div className="fixed top-16 sm:top-20 right-2 sm:right-4 z-50 w-[calc(100vw-1rem)] sm:w-80 max-w-sm animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
-          <Card className="border border-gray-200">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+        <div className="fixed top-16 sm:top-20 right-3 sm:right-4 z-50 w-[calc(100vw-1.5rem)] sm:w-80 max-w-sm animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
+          <Card className="border border-gray-300 rounded-lg shadow-xl bg-white">
+            <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between space-y-0 border-b border-gray-200">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <img src={gearIcon} alt="Settings" className="h-5 w-5" />
                 Settings
@@ -181,7 +214,7 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <form onSubmit={handleSaveSettingsUsername} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="settings-username" className="text-sm font-medium flex items-center gap-2">
@@ -189,14 +222,32 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                     Username
                   </Label>
                   <div className="flex gap-2">
-                    <Input
-                      id="settings-username"
-                      value={settingsUsername}
-                      onChange={(e) => setSettingsUsername(e.target.value)}
-                      placeholder="Enter username"
-                      className="h-9"
-                    />
-                    <Button type="submit" size="sm" disabled={settingsLoading}>
+                    <TooltipProvider>
+                      <Tooltip open={settingsUsername.trim().length > MAX_USERNAME_LENGTH}>
+                        <TooltipTrigger asChild>
+                          <Input
+                            id="settings-username"
+                            value={settingsUsername}
+                            onChange={(e) => setSettingsUsername(e.target.value)}
+                            placeholder="Enter username"
+                            maxLength={MAX_USERNAME_LENGTH + 5}
+                            className={cn(
+                              "h-9 border-gray-300 rounded-lg focus:border-gray-400",
+                              settingsUsername.trim().length > MAX_USERNAME_LENGTH && "border-red-500 focus-visible:ring-red-500"
+                            )}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-red-500 text-white">
+                          <p>Choose a shorter name! (max {MAX_USERNAME_LENGTH} chars)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="rounded-lg"
+                      disabled={settingsLoading || settingsUsername.trim().length > MAX_USERNAME_LENGTH || settingsUsername.trim().length === 0}
+                    >
                       {settingsLoading ? '...' : 'Save'}
                     </Button>
                   </div>
@@ -207,6 +258,16 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                   )}
                 </div>
               </form>
+              <div className="border-t border-gray-200 pt-4">
+                <Link
+                  to="/feedback"
+                  onClick={() => setShowSettings(false)}
+                  className="block w-full text-center py-2 rounded-lg text-white text-sm font-medium"
+                  style={{ backgroundColor: colors.purple }}
+                >
+                  Submit Feedback
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>

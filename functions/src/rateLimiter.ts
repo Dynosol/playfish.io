@@ -36,6 +36,9 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'user:updateUsername': { maxRequests: 5, windowMs: 60000 },
   'user:createOrUpdateUser': { maxRequests: 10, windowMs: 60000 },
   'user:updateUserLastOnline': { maxRequests: 60, windowMs: 60000 },
+
+  // Feedback
+  'feedback:submitFeedback': { maxRequests: 1, windowMs: 60000 },
 };
 
 export async function checkRateLimit(

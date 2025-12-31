@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RotateCcw, Shuffle, ArrowDownUp } from 'lucide-react';
 import leaveIcon from '@/assets/leave.png';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,11 @@ interface GameInfoSheetProps {
   onLeaveGame: () => void;
   onReturnToLobby: () => void;
   onDeclare: () => void;
+  onAsk: () => void;
   isPlayerAlive: boolean;
+  onShuffle?: () => void;
+  onSort?: () => void;
+  sortToast?: { message: string; visible: boolean };
 }
 
 export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
@@ -32,7 +36,7 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
   user,
   isHost,
   isPlayer,
-  isMyTurn: _isMyTurn,
+  isMyTurn,
   isInDeclarePhase,
   isGameOver,
   isDeclaring,
@@ -40,7 +44,11 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
   onLeaveGame,
   onReturnToLobby,
   onDeclare,
+  onAsk,
   isPlayerAlive,
+  onShuffle,
+  onSort,
+  sortToast,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -122,37 +130,65 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
           {/* Actions */}
           <div className="flex flex-wrap gap-2 pt-2 border-t">
             {isPlayer && !isGameOver && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <Button
-                        onClick={onDeclare}
-                        disabled={isDeclaring || isInDeclarePhase || !isPlayer || !isPlayerAlive}
-                        size="sm"
-                        className={cn(
-                          "text-xs h-8 font-semibold transition-all text-white relative",
-                          (isDeclaring || isInDeclarePhase || !isPlayerAlive)
-                            ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
-                            : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
-                        )}
-                        style={{ backgroundColor: colors.purple }}
-                      >
-                        {isDeclaring ? 'STARTING...' : 'DECLARE'}
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {!isPlayerAlive
-                        ? 'You have no cards'
-                        : isInDeclarePhase
-                          ? 'Declaration in progress'
-                          : 'Are you sure?'}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Button
+                          onClick={onAsk}
+                          disabled={!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer}
+                          size="sm"
+                          className={cn(
+                            "text-xs h-8 font-semibold transition-all relative",
+                            (!isMyTurn || isInDeclarePhase || isGameOver || !isPlayer)
+                              ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
+                              : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
+                          )}
+                        >
+                          ASK
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    {(!isMyTurn || isInDeclarePhase) && (
+                      <TooltipContent>
+                        <p>It is not your turn</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Button
+                          onClick={onDeclare}
+                          disabled={isDeclaring || isInDeclarePhase || !isPlayer || !isPlayerAlive}
+                          size="sm"
+                          className={cn(
+                            "text-xs h-8 font-semibold transition-all text-white relative",
+                            (isDeclaring || isInDeclarePhase || !isPlayerAlive)
+                              ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
+                              : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
+                          )}
+                          style={{ backgroundColor: colors.purple }}
+                        >
+                          {isDeclaring ? 'STARTING...' : 'DECLARE'}
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {!isPlayerAlive
+                          ? 'You have no cards'
+                          : isInDeclarePhase
+                            ? 'Declaration in progress'
+                            : 'Are you sure?'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             )}
             <button
               onClick={onLeaveGame}
@@ -174,6 +210,42 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
               </button>
             )}
           </div>
+
+          {/* Card Organization */}
+          {isPlayer && onShuffle && onSort && (
+            <div className="relative pt-2 border-t mt-2">
+              {sortToast && (
+                <div className={cn(
+                  "absolute -top-1 left-0 right-0 text-center bg-black/80 text-white text-xs px-2 py-1 rounded-full transition-opacity duration-200 pointer-events-none -translate-y-full",
+                  sortToast.visible ? "opacity-100" : "opacity-0"
+                )}>
+                  {sortToast.message}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1 h-7 text-xs bg-white border border-gray-200 hover:bg-gray-50"
+                  onClick={onSort}
+                  title="Sort cards"
+                >
+                  <ArrowDownUp className="h-3.5 w-3.5 mr-1" />
+                  Sort
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1 h-7 text-xs bg-white border border-gray-200 hover:bg-gray-50"
+                  onClick={onShuffle}
+                  title="Shuffle cards"
+                >
+                  <Shuffle className="h-3.5 w-3.5 mr-1" />
+                  Shuffle
+                </Button>
+              </div>
+            </div>
+          )}
 
           {declareError && (
             <div className="text-xs text-destructive">{declareError}</div>

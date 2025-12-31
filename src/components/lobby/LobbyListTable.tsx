@@ -49,11 +49,11 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
           <Table className="min-w-[500px]">
             <TableHeader>
               <TableRow className="h-8 text-xs sm:text-sm">
-                <TableHead className="py-1">Lobby Name</TableHead>
-                <TableHead className="py-1">Host</TableHead>
-                <TableHead className="py-1">Players</TableHead>
-                <TableHead className="py-1">Status</TableHead>
-                <TableHead className="py-1 text-right">Action</TableHead>
+                <TableHead className="py-1 whitespace-nowrap">Lobby Name</TableHead>
+                <TableHead className="py-1 whitespace-nowrap">Host</TableHead>
+                <TableHead className="py-1 whitespace-nowrap">Players</TableHead>
+                <TableHead className="py-1 whitespace-nowrap">Status</TableHead>
+                <TableHead className="py-1 text-right whitespace-nowrap">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -71,16 +71,16 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
 
                 return (
                   <TableRow key={lobby.id} className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
-                    <TableCell className="py-1 font-medium">{lobby.name}</TableCell>
-                    <TableCell className="py-1">
+                    <TableCell className="py-1 font-medium whitespace-nowrap">{lobby.name}</TableCell>
+                    <TableCell className="py-1 whitespace-nowrap">
                       <span className="font-semibold" style={{ color: getHostColor(lobby.createdBy) }}>
                         {getHostUsername(lobby.createdBy)}
                       </span>
                     </TableCell>
-                    <TableCell className="py-1">
+                    <TableCell className="py-1 whitespace-nowrap">
                       {lobby.players?.length || 0}/{lobby.maxPlayers || 4}
                     </TableCell>
-                    <TableCell className="py-1">
+                    <TableCell className="py-1 whitespace-nowrap">
                       {lobby.status === 'waiting' ? (
                         <Badge
                           className="font-normal text-white"
@@ -94,7 +94,7 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="py-1 text-right">
+                    <TableCell className="py-1 text-right whitespace-nowrap">
                       {isInThisLobby ? (
                         hasUserLeftGame && lobby.status === 'playing' ? (
                           <Button

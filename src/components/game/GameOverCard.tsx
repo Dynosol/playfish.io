@@ -34,14 +34,14 @@ const GameOverCard: React.FC<GameOverCardProps> = ({
   getUserColor,
 }) => {
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-30">
-      <UICard className="w-96 rounded shadow">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">
+    <div className="absolute inset-0 flex items-center justify-center z-30 p-4">
+      <UICard className="w-full max-w-sm rounded shadow">
+        <CardHeader className="pb-2 sm:pb-4">
+          <CardTitle className="text-xl sm:text-2xl text-center">
             {winningTeam === 0 ? 'RED TEAM' : 'BLUE TEAM'} WINS!
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4">
           <div>
             <h3 className="font-semibold mb-2 text-sm">Winning Team:</h3>
             <ul className="text-sm space-y-1">
@@ -56,7 +56,7 @@ const GameOverCard: React.FC<GameOverCardProps> = ({
               ))}
             </ul>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             {isHost ? (
               <Button onClick={onReplay} size="sm" className="flex-1 rounded">
                 Replay {nonHostPlayersCount > 0 ? `(${replayVoteCount}/${nonHostPlayersCount})` : ''}

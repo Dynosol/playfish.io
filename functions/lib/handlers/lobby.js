@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = void 0;
+exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.MAX_LOBBY_NAME_LENGTH = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
@@ -43,6 +43,8 @@ const usernameGenerator_1 = require("../utils/usernameGenerator");
 const userColors_1 = require("../utils/userColors");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
+// Validation constants
+exports.MAX_LOBBY_NAME_LENGTH = 30;
 // Word lists for lobby ID generation
 const adjectives = ['red', 'blue', 'green', 'gold', 'swift', 'calm', 'bold', 'wise'];
 const nouns = ['fox', 'owl', 'wolf', 'bear', 'hawk', 'deer', 'lion', 'eagle'];
@@ -139,6 +141,9 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins }, async (request)
     // Validate input
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
         throw new https_1.HttpsError('invalid-argument', 'Lobby name is required');
+    }
+    if (name.trim().length > exports.MAX_LOBBY_NAME_LENGTH) {
+        throw new https_1.HttpsError('invalid-argument', `Lobby name must be ${exports.MAX_LOBBY_NAME_LENGTH} characters or less`);
     }
     if (!maxPlayers || typeof maxPlayers !== 'number' || maxPlayers < 2 || maxPlayers > 6) {
         throw new https_1.HttpsError('invalid-argument', 'maxPlayers must be between 2 and 6');

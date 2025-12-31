@@ -33,13 +33,15 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.sendMessage = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.submitFeedback = exports.sendMessage = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 // Export all handlers
 var chat_1 = require("./handlers/chat");
 Object.defineProperty(exports, "sendMessage", { enumerable: true, get: function () { return chat_1.sendMessage; } });
+var feedback_1 = require("./handlers/feedback");
+Object.defineProperty(exports, "submitFeedback", { enumerable: true, get: function () { return feedback_1.submitFeedback; } });
 var user_1 = require("./handlers/user");
 Object.defineProperty(exports, "createOrUpdateUser", { enumerable: true, get: function () { return user_1.createOrUpdateUser; } });
 Object.defineProperty(exports, "updateUsername", { enumerable: true, get: function () { return user_1.updateUsername; } });

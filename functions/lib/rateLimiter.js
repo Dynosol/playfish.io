@@ -63,6 +63,8 @@ const RATE_LIMITS = {
     'user:updateUsername': { maxRequests: 5, windowMs: 60000 },
     'user:createOrUpdateUser': { maxRequests: 10, windowMs: 60000 },
     'user:updateUserLastOnline': { maxRequests: 60, windowMs: 60000 },
+    // Feedback
+    'feedback:submitFeedback': { maxRequests: 1, windowMs: 60000 },
 };
 async function checkRateLimit(userId, action) {
     const config = RATE_LIMITS[action];

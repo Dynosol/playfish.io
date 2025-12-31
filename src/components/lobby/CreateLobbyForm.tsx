@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { colors } from '@/utils/colors';
 import type { Lobby } from '@/firebase/lobbyService';
+
+// Must match cloud function MAX_LOBBY_NAME_LENGTH
+const MAX_LOBBY_NAME_LENGTH = 30;
 
 const sanitizeLobbyName = (name: string): string => {
   // Trim whitespace and collapse multiple spaces
@@ -17,8 +21,8 @@ const validateLobbyName = (name: string): string | null => {
   if (sanitized.length < 2) {
     return 'Lobby name must be at least 2 characters';
   }
-  if (sanitized.length > 30) {
-    return 'Lobby name must be 30 characters or less';
+  if (sanitized.length > MAX_LOBBY_NAME_LENGTH) {
+    return `Lobby name must be ${MAX_LOBBY_NAME_LENGTH} characters or less`;
   }
   return null;
 };
@@ -70,18 +74,32 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-4">
               <label htmlFor="lobbyName" className="text-sm font-medium">Lobby name</label>
-              <input
-                id="lobbyName"
-                type="text"
-                className={`w-40 px-2 py-1 border rounded text-sm outline-none ${lobbyNameError ? 'border-red-500' : 'border-gray-300 focus:border-gray-400'}`}
-                placeholder="Enter name"
-                value={lobbyName}
-                onChange={(e) => {
-                  setLobbyName(e.target.value);
-                  if (lobbyNameError) setLobbyNameError('');
-                }}
-                disabled={creating || !!currentLobby}
-              />
+              <TooltipProvider>
+                <Tooltip open={sanitizeLobbyName(lobbyName).length > MAX_LOBBY_NAME_LENGTH}>
+                  <TooltipTrigger asChild>
+                    <input
+                      id="lobbyName"
+                      type="text"
+                      className={`w-40 px-2 py-1 border rounded text-sm outline-none ${
+                        lobbyNameError || sanitizeLobbyName(lobbyName).length > MAX_LOBBY_NAME_LENGTH
+                          ? 'border-red-500'
+                          : 'border-gray-300 focus:border-gray-400'
+                      }`}
+                      placeholder="Enter name"
+                      value={lobbyName}
+                      maxLength={MAX_LOBBY_NAME_LENGTH + 5}
+                      onChange={(e) => {
+                        setLobbyName(e.target.value);
+                        if (lobbyNameError) setLobbyNameError('');
+                      }}
+                      disabled={creating || !!currentLobby}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="bg-red-500 text-white">
+                    <p>Choose a shorter name!</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {lobbyNameError && (
               <p className="text-xs text-red-500 text-right">{lobbyNameError}</p>

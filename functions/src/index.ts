@@ -6,6 +6,8 @@ admin.initializeApp();
 // Export all handlers
 export { sendMessage } from './handlers/chat';
 
+export { submitFeedback } from './handlers/feedback';
+
 export {
   createOrUpdateUser,
   updateUsername,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToUser, updateUsername } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
+import { colors } from '../utils/colors';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -99,6 +100,26 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <h2>Feedback</h2>
+        <p style={{ marginBottom: '1rem', color: colors.grayMedium }}>
+          Have suggestions or found a bug? Let us know!
+        </p>
+        <Link
+          to="/feedback"
+          style={{
+            display: 'inline-block',
+            padding: '0.5rem 1rem',
+            backgroundColor: colors.purple,
+            color: 'white',
+            borderRadius: '0.375rem',
+            textDecoration: 'none'
+          }}
+        >
+          Submit Feedback
+        </Link>
       </div>
     </div>
   );

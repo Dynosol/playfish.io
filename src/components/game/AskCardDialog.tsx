@@ -1,12 +1,23 @@
 import React from 'react';
-import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import type { Card } from '@/firebase/gameService';
+import { colors } from '@/utils/colors';
 
-const allSuits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
-const allRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
+const suitIcons: Record<Card['suit'], string> = {
+  spades: '♠',
+  hearts: '♥',
+  clubs: '♣',
+  diamonds: '♦'
+};
+
+const suits: Card['suit'][] = ['spades', 'hearts', 'clubs', 'diamonds'];
+const rankRows: Card['rank'][][] = [
+  ['2', '3', '4'],
+  ['5', '6', '7'],
+  ['9', '10', 'J'],
+  ['Q', 'K', 'A']
+];
 
 interface AskCardDialogProps {
   selectedSuit: Card['suit'];
@@ -18,6 +29,7 @@ interface AskCardDialogProps {
   canAsk: boolean;
   isAsking: boolean;
   errorMessage: string;
+  playerHand: Card[];
 }
 
 const AskCardDialog: React.FC<AskCardDialogProps> = ({
@@ -30,44 +42,119 @@ const AskCardDialog: React.FC<AskCardDialogProps> = ({
   canAsk,
   isAsking,
   errorMessage,
+  playerHand,
 }) => {
+  const isRedSuit = (suit: Card['suit']) => suit === 'hearts' || suit === 'diamonds';
+
+  const hasCardAlready = playerHand.some(
+    card => card.suit === selectedSuit && card.rank === selectedRank
+  );
+
   return (
-    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-      <UICard className="w-80 pointer-events-auto rounded shadow">
-        <CardHeader>
-          <CardTitle className="text-sm">Your Turn</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
+      <div className="w-80 bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gray-700 px-4 py-3">
+          <h2 className="text-white font-semibold">YOUR TURN</h2>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 space-y-4">
+          {/* Suit Selection - 2x2 grid */}
           <div className="space-y-2">
-            <Label className="text-xs">Suit</Label>
-            <Select value={selectedSuit} onValueChange={(value) => onSuitChange(value as Card['suit'])}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {allSuits.map(suit => (
-                  <SelectItem key={suit} value={suit} className="text-xs">{suit}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <h4 className="font-semibold text-sm text-gray-700">Select Suit</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {suits.map(suit => (
+                <Button
+                  key={suit}
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "rounded h-10 justify-center gap-2",
+                    selectedSuit === suit && "ring-2 ring-offset-1 ring-gray-700"
+                  )}
+                  onClick={() => onSuitChange(suit)}
+                >
+                  <span
+                    className="text-xl leading-none"
+                    style={{ color: isRedSuit(suit) ? '#ef4444' : '#000000' }}
+                  >
+                    {suitIcons[suit]}
+                  </span>
+                  <span className="capitalize text-xs">{suit}</span>
+                </Button>
+              ))}
+            </div>
           </div>
+
+          {/* Rank Selection - Keypad style */}
           <div className="space-y-2">
-            <Label className="text-xs">Rank</Label>
-            <Select value={selectedRank} onValueChange={(value) => onRankChange(value as Card['rank'])}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {allRanks.map(rank => (
-                  <SelectItem key={rank} value={rank} className="text-xs">{rank}</SelectItem>
+            <h4 className="font-semibold text-sm text-gray-700">Select Rank</h4>
+            <div className="space-y-2">
+              {/* Low half-suit: 2-7 */}
+              <div className="border border-gray-300 rounded-lg p-1.5 space-y-1">
+                {rankRows.slice(0, 2).map((row, rowIndex) => (
+                  <div key={rowIndex} className="grid grid-cols-3 gap-1">
+                    {row.map(rank => (
+                      <Button
+                        key={rank}
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "rounded h-9 font-medium",
+                          selectedRank === rank && "ring-2 ring-offset-1 ring-gray-700"
+                        )}
+                        onClick={() => onRankChange(rank)}
+                      >
+                        {rank}
+                      </Button>
+                    ))}
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+              {/* High half-suit: 9-A */}
+              <div className="border border-gray-300 rounded-lg p-1.5 space-y-1">
+                {rankRows.slice(2, 4).map((row, rowIndex) => (
+                  <div key={rowIndex} className="grid grid-cols-3 gap-1">
+                    {row.map(rank => (
+                      <Button
+                        key={rank}
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "rounded h-9 font-medium",
+                          selectedRank === rank && "ring-2 ring-offset-1 ring-gray-700"
+                        )}
+                        onClick={() => onRankChange(rank)}
+                      >
+                        {rank}
+                      </Button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {/* Error message */}
+          {errorMessage && (
+            <div className="text-xs p-2 rounded" style={{ color: colors.red, backgroundColor: `${colors.red}15` }}>
+              {errorMessage}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t bg-gray-50 space-y-2">
+          {hasCardAlready && (
+            <div className="text-xs text-center" style={{ color: colors.red }}>
+              You have this card already!
+            </div>
+          )}
           <div className="flex gap-2">
             <Button
               onClick={onAsk}
-              disabled={!canAsk || isAsking}
+              disabled={!canAsk || isAsking || hasCardAlready}
               size="sm"
               className="flex-1 rounded"
             >
@@ -82,11 +169,8 @@ const AskCardDialog: React.FC<AskCardDialogProps> = ({
               Cancel
             </Button>
           </div>
-          {errorMessage && (
-            <div className="text-xs text-destructive">{errorMessage}</div>
-          )}
-        </CardContent>
-      </UICard>
+        </div>
+      </div>
     </div>
   );
 };

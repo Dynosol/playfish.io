@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = void 0;
+exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.MAX_USERNAME_LENGTH = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
@@ -42,6 +42,8 @@ const usernameGenerator_1 = require("../utils/usernameGenerator");
 const userColors_1 = require("../utils/userColors");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
+// Validation constants
+exports.MAX_USERNAME_LENGTH = 20;
 exports.createOrUpdateUser = (0, https_1.onCall)({ cors: corsOrigins }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
@@ -90,8 +92,8 @@ exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins }, async (reque
     if (trimmedUsername.length === 0) {
         throw new https_1.HttpsError('invalid-argument', 'Username cannot be empty');
     }
-    if (trimmedUsername.length > 50) {
-        throw new https_1.HttpsError('invalid-argument', 'Username must be 50 characters or less');
+    if (trimmedUsername.length > exports.MAX_USERNAME_LENGTH) {
+        throw new https_1.HttpsError('invalid-argument', `Username must be ${exports.MAX_USERNAME_LENGTH} characters or less`);
     }
     // Check rate limit
     await (0, rateLimiter_1.checkRateLimit)(uid, 'user:updateUsername');

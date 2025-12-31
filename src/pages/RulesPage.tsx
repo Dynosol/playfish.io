@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Header from '@/components/Header';
 import SEO from '@/components/SEO';
+import { colors } from '@/utils/colors';
 
 const rulesStructuredData = {
   "@context": "https://schema.org",
@@ -119,13 +120,23 @@ const RulesPage: React.FC = () => {
 
       <main className="flex-1 overflow-y-auto p-3">
         <div className="container mx-auto max-w-3xl">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-3"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <button
+              onClick={() => navigate('/about')}
+              className="flex items-center gap-2 hover:opacity-70 underline"
+              style={{ color: colors.green }}
+            >
+              Tell me more
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
 
           <article className="prose prose-gray max-w-none">
             <h1 className="text-3xl font-bold mb-6">Rules of Fish</h1>
