@@ -142,69 +142,73 @@ const RulesPage: React.FC = () => {
             <h1 className="text-3xl font-bold mb-6">Rules of Fish</h1>
 
             <p className="text-lg text-gray-600 mb-8">
-              Fish is a classic card game for 4, 6, or 8 players, split into two equal teams.
+              Fish is a team card game for 4, 6, or 8 players. Two teams compete to claim the most half-suits through questions and deduction.
             </p>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Set-Up</h2>
+              <h2 className="text-xl font-semibold mb-4">The Deck</h2>
               <p>
-                Players are divided into two equal teams. The deck is automatically prepared and dealt evenly among all players.
+                A standard deck with all 8s removed, leaving 48 cards. These form eight half-suits:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li><strong>Low:</strong> 2, 3, 4, 5, 6, 7 of each suit</li>
+                <li><strong>High:</strong> 9, 10, J, Q, K, A of each suit</li>
+              </ul>
+              <p className="mt-4">
+                Cards are dealt evenly. Players sit alternating by team.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Taking a Turn</h2>
+              <p>
+                On your turn, ask any opponent for a specific card. Your question is valid only if:
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>You hold at least one card from that half-suit</li>
+                <li>You do not already have the card you're asking for</li>
+              </ul>
+              <p className="mt-4">
+                <strong>If they have it:</strong> They give it to you face-up. You ask again.
               </p>
               <p className="mt-4">
-                The deck contains no 8s, leaving eight half-suits: low cards (2, 3, 4, 5, 6, 7) and high cards (9, 10, J, Q, K, A) for each suit—clubs, diamonds, hearts, and spades.
+                <strong>If they don't:</strong> The turn passes to them.
               </p>
-              <p className="mt-4 font-medium">
-                The objective of Fish is for your team to secure more half-suits than the opposing team.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Gameplay</h2>
-              <p>
-                Each player's aim is to gather and track information about which cards and half-suits are held by every player. A player is allowed to ask another player for a card only if:
-              </p>
-              <ul className="list-disc list-inside mt-2 space-y-2">
-                <li>The requested card belongs to a half-suit of which the asker already holds at least one card, and</li>
-                <li>The asker does not already possess the specific card being requested.</li>
-              </ul>
-              <p className="mt-4 italic">
-                You may only ask opponents for cards—never your own teammates.
-              </p>
-              <p className="mt-4 italic">
-                If the opponent has the card, they must give it to you and you get to ask again.
-              </p>
-              <p className="mt-4 italic">
-                If they don't have it, the turn passes to them and they become the asker.
+              <p className="mt-4 text-gray-600 italic">
+                You may only ask opponents—never teammates.
               </p>
             </section>
-
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Illegal Questions</h2>
-              <p>
-                A question becomes illegal if either of the two above conditions is violated. This most often happens when players continue probing a half-suit after they no longer hold a card from it.
-              </p>
-              </section>
 
             <section className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Making a Declaration</h2>
               <p>
-                A player's strategy typically focuses on either collecting an entire half-suit personally or determining exactly which teammates hold each card of a half-suit. Once a player either holds all six cards of a half-suit or knows the precise location of every card in that half-suit among their teammates, they may declare.
+                When you believe your team holds all six cards of a half-suit, you may declare it on your turn. State exactly which teammate has which card.
               </p>
               <p className="mt-4">
-                A declaration is a formal statement that the declaring player knows their team possesses an entire half-suit and can correctly identify which player holds each card.
+                <strong>If correct:</strong> Your team claims that half-suit.
               </p>
-              <p className="mt-4 font-medium text-red-600">
-                Declarations are serious actions and should only be made when the player is completely certain.
+              <p className="mt-4">
+                <strong>If incorrect:</strong> The opposing team claims that half-suit—even if your team had all the cards but you named the wrong holder.
               </p>
-              <p className="mt-4 font-medium">
-                If a declaration is incorrect, the opposing team automatically gains that half-suit, regardless of where the cards actually were.
+              <p className="mt-4 font-medium" style={{ color: colors.red }}>
+                Only declare when you are certain. A wrong guess hands the half-suit to your opponents.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Winning the Game</h2>
+              <h2 className="text-xl font-semibold mb-4">Running Out of Cards</h2>
               <p>
-                The outcome of the game is decided entirely by declarations. The team that successfully declares the greatest number of half-suits wins. Making an uncertain declaration is a guaranteed way to hand victory to the other team.
+                Players who lose all their cards cannot be asked questions, so the turn cannot pass to them.
+              </p>
+              <p className="mt-4">
+                When one team has no cards left, the other team must declare all remaining half-suits without consulting each other.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Winning</h2>
+              <p>
+                The team that declares the most half-suits wins. With eight half-suits total, you need five to win outright. Ties at four each are possible.
               </p>
             </section>
 
