@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { colors } from '@/utils/colors';
+import { containsProfanity } from '@/utils/profanityFilter';
 import type { Lobby } from '@/firebase/lobbyService';
 
 // Must match cloud function MAX_LOBBY_NAME_LENGTH
@@ -15,21 +16,22 @@ const sanitizeLobbyName = (name: string): string => {
 
 const validateLobbyName = (name: string): string | null => {
   const sanitized = sanitizeLobbyName(name);
+  // Empty name is valid - server will use auto-generated lobby ID as name
   if (!sanitized) {
-    return 'Please enter a lobby name';
-  }
-  if (sanitized.length < 2) {
-    return 'Lobby name must be at least 2 characters';
+    return null;
   }
   if (sanitized.length > MAX_LOBBY_NAME_LENGTH) {
     return `Lobby name must be ${MAX_LOBBY_NAME_LENGTH} characters or less`;
+  }
+  if (containsProfanity(sanitized)) {
+    return 'Lobby name contains inappropriate language';
   }
   return null;
 };
 
 interface CreateLobbyFormProps {
   currentLobby: Lobby | null;
-  onCreateLobby: (name: string, maxPlayers: number) => Promise<void>;
+  onCreateLobby: (name: string, maxPlayers: number, isPrivate: boolean) => Promise<void>;
 }
 
 const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
@@ -39,6 +41,7 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
   const [lobbyName, setLobbyName] = useState('');
   const [lobbyNameError, setLobbyNameError] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<string>("4");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +59,7 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
     setCreating(true);
 
     try {
-      await onCreateLobby(sanitizeLobbyName(lobbyName), parseInt(maxPlayers));
+      await onCreateLobby(sanitizeLobbyName(lobbyName), parseInt(maxPlayers), isPrivate);
     } catch (error) {
       console.error('Error creating lobby:', error);
     } finally {
@@ -85,7 +88,7 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
                           ? 'border-red-500'
                           : 'border-gray-300 focus:border-gray-400'
                       }`}
-                      placeholder="Enter name"
+                      placeholder="(optional)"
                       value={lobbyName}
                       maxLength={MAX_LOBBY_NAME_LENGTH + 5}
                       onChange={(e) => {
@@ -119,6 +122,25 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
               <option value="6">6</option>
               <option value="8">8</option>
             </select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label htmlFor="isPrivate" className="text-sm font-medium">Private room</label>
+            <button
+              id="isPrivate"
+              type="button"
+              role="switch"
+              aria-checked={isPrivate}
+              onClick={() => setIsPrivate(!isPrivate)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                isPrivate ? 'bg-purple-600' : 'bg-gray-300'
+              }`}
+              disabled={creating || !!currentLobby}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isPrivate ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
           </div>
         </CardContent>
         <CardFooter className="p-3 pt-0">

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUserDocument } from '../contexts/UserDocumentContext';
 import { updateUsername } from '../firebase/userService';
 import { colors } from '../utils/colors';
+import { containsProfanity } from '../utils/profanityFilter';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -34,6 +35,11 @@ const SettingsPage: React.FC = () => {
   const handleSaveUsername = async () => {
     if (!user || !newUsername.trim()) {
       setError('Username cannot be empty');
+      return;
+    }
+
+    if (containsProfanity(newUsername.trim())) {
+      setError('Username contains inappropriate language');
       return;
     }
 

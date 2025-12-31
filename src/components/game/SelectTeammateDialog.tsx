@@ -3,21 +3,21 @@ import { Button } from "@/components/ui/button";
 import { User } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
-interface SelectOpponentDialogProps {
-  opponents: string[];
+interface SelectTeammateDialogProps {
+  teammates: string[];
   teams: { [playerId: string]: 0 | 1 };
   playerHands: { [playerId: string]: unknown[] };
-  onSelectOpponent: (playerId: string) => void;
+  onSelectTeammate: (playerId: string) => void;
   onCancel: () => void;
   getUsername: (playerId: string) => string;
   getUserColor: (playerId: string) => string;
 }
 
-const SelectOpponentDialog: React.FC<SelectOpponentDialogProps> = ({
-  opponents,
+const SelectTeammateDialog: React.FC<SelectTeammateDialogProps> = ({
+  teammates,
   teams,
   playerHands,
-  onSelectOpponent,
+  onSelectTeammate,
   onCancel,
   getUsername,
   getUserColor,
@@ -27,14 +27,14 @@ const SelectOpponentDialog: React.FC<SelectOpponentDialogProps> = ({
       <div className="w-80 bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-gray-700 px-4 py-3">
-          <h2 className="text-white font-semibold">SELECT OPPONENT</h2>
+          <h2 className="text-white font-semibold">PASS TURN TO TEAMMATE</h2>
         </div>
 
         {/* Content */}
         <div className="p-4 space-y-2">
-          <p className="text-sm text-gray-600 mb-3">Choose an opponent to ask for a card:</p>
+          <p className="text-sm text-gray-600 mb-3">You have no cards. Choose a teammate to pass the turn to:</p>
 
-          {opponents.map((playerId) => {
+          {teammates.map((playerId) => {
             const handSize = playerHands[playerId]?.length || 0;
             const teamColor = teams[playerId] === 0 ? '#ef4444' : '#3b82f6';
             const teamName = teams[playerId] === 0 ? 'Red' : 'Blue';
@@ -43,7 +43,7 @@ const SelectOpponentDialog: React.FC<SelectOpponentDialogProps> = ({
             return (
               <button
                 key={playerId}
-                onClick={() => !hasNoCards && onSelectOpponent(playerId)}
+                onClick={() => !hasNoCards && onSelectTeammate(playerId)}
                 disabled={hasNoCards}
                 className={cn(
                   "w-full p-3 rounded-lg border-2 flex items-center gap-3 text-left transition-all",
@@ -93,4 +93,4 @@ const SelectOpponentDialog: React.FC<SelectOpponentDialogProps> = ({
   );
 };
 
-export default SelectOpponentDialog;
+export default SelectTeammateDialog;

@@ -6,6 +6,7 @@ import { checkRateLimit } from '../rateLimiter';
 import { createGame, archiveCompletedGameFromLobby } from './game';
 import { generateUsername } from '../utils/usernameGenerator';
 import { getRandomUserColor } from '../utils/userColors';
+import { containsProfanity } from '../utils/profanityFilter';
 
 const db = admin.firestore();
 
@@ -28,6 +29,7 @@ interface Lobby {
   historicalScores: { 0: number; 1: number };
   lastActivityAt?: number;
   stale?: boolean;
+  isPrivate?: boolean;
 }
 
 // Word lists for lobby ID generation
@@ -132,8 +134,9 @@ const areTeamsEven = (lobby: Lobby): boolean => {
 };
 
 interface CreateLobbyData {
-  name: string;
+  name?: string;
   maxPlayers: number;
+  isPrivate?: boolean;
 }
 
 export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
@@ -144,13 +147,7 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
   const userId = request.auth.uid;
   const { name, maxPlayers } = request.data as CreateLobbyData;
 
-  // Validate input
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    throw new HttpsError('invalid-argument', 'Lobby name is required');
-  }
-  if (name.trim().length > MAX_LOBBY_NAME_LENGTH) {
-    throw new HttpsError('invalid-argument', `Lobby name must be ${MAX_LOBBY_NAME_LENGTH} characters or less`);
-  }
+  // Validate maxPlayers
   if (!maxPlayers || typeof maxPlayers !== 'number' || maxPlayers < 2 || maxPlayers > 6) {
     throw new HttpsError('invalid-argument', 'maxPlayers must be between 2 and 6');
   }
@@ -179,9 +176,24 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
 
   const uuid = require('crypto').randomUUID();
 
+  const { isPrivate } = request.data as CreateLobbyData;
+
+  // Determine lobby name: use provided name or default to lobbyId
+  let lobbyName = lobbyId;
+  if (name && typeof name === 'string' && name.trim().length > 0) {
+    const trimmedName = name.trim();
+    if (trimmedName.length > MAX_LOBBY_NAME_LENGTH) {
+      throw new HttpsError('invalid-argument', `Lobby name must be ${MAX_LOBBY_NAME_LENGTH} characters or less`);
+    }
+    if (containsProfanity(trimmedName)) {
+      throw new HttpsError('invalid-argument', 'Lobby name contains inappropriate language');
+    }
+    lobbyName = trimmedName;
+  }
+
   const lobbyRef = db.collection('lobbies').doc(lobbyId);
   await lobbyRef.set({
-    name: name.trim(),
+    name: lobbyName,
     createdBy: userId,
     maxPlayers,
     uuid,
@@ -192,7 +204,8 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
     historicalScores: { 0: 0, 1: 0 },
     createdAt: FieldValue.serverTimestamp(),
     lastActivityAt: Date.now(),
-    stale: false
+    stale: false,
+    isPrivate: isPrivate || false
   });
 
   await updateUserCurrentLobby(userId, lobbyId);

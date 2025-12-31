@@ -40,6 +40,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const rateLimiter_1 = require("../rateLimiter");
 const usernameGenerator_1 = require("../utils/usernameGenerator");
 const userColors_1 = require("../utils/userColors");
+const profanityFilter_1 = require("../utils/profanityFilter");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 // Validation constants
@@ -94,6 +95,9 @@ exports.updateUsername = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'publ
     }
     if (trimmedUsername.length > exports.MAX_USERNAME_LENGTH) {
         throw new https_1.HttpsError('invalid-argument', `Username must be ${exports.MAX_USERNAME_LENGTH} characters or less`);
+    }
+    if ((0, profanityFilter_1.containsProfanity)(trimmedUsername)) {
+        throw new https_1.HttpsError('invalid-argument', 'Username contains inappropriate language');
     }
     // Check rate limit
     await (0, rateLimiter_1.checkRateLimit)(uid, 'user:updateUsername');

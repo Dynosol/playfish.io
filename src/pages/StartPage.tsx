@@ -49,14 +49,15 @@ const StartPage: React.FC = () => {
     };
   }, [user]);
 
-  const handleCreateLobby = async (name: string, maxPlayers: number) => {
+  const handleCreateLobby = async (name: string, maxPlayers: number, isPrivate: boolean) => {
     if (!user) return;
     if (currentLobby) return;
 
     const lobbyId = await createLobby({
       name,
       createdBy: user.uid,
-      maxPlayers
+      maxPlayers,
+      isPrivate
     });
     navigate(`/lobby/${lobbyId}`);
   };

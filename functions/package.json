@@ -15,10 +15,12 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/functions-framework": "^4.0.1",
+    "bad-words": "^4.0.0",
     "firebase-admin": "^13.0.2",
     "firebase-functions": "^6.3.0"
   },
   "devDependencies": {
+    "@types/bad-words": "^3.0.3",
     "typescript": "^5.7.2"
   },
   "private": true

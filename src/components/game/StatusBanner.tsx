@@ -129,6 +129,34 @@ interface LeftPlayerBannerProps {
   getUsername: (playerId: string) => string;
 }
 
+interface PassTurnBannerProps {
+  onPassTurnClick?: () => void;
+}
+
+export const PassTurnBanner: React.FC<PassTurnBannerProps> = ({
+  onPassTurnClick,
+}) => {
+  return (
+    <StatusBanner backgroundColor={colors.amber}>
+      <span className="inline-flex items-center gap-2">
+        <span className="font-semibold">It's your turn but you have no cards!</span>
+        {onPassTurnClick && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPassTurnClick();
+            }}
+            className="ml-2 px-3 py-0.5 bg-white/20 hover:bg-white/30 rounded text-white font-medium transition-colors"
+          >
+            Pass to teammate
+          </button>
+        )}
+      </span>
+    </StatusBanner>
+  );
+};
+
 export const LeftPlayerBanner: React.FC<LeftPlayerBannerProps> = ({
   leftPlayerId,
   leftReason,

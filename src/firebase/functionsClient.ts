@@ -50,7 +50,7 @@ export const callUpdateUserCurrentLobby = createCallable<
 
 // Lobby functions
 export const callCreateLobby = createCallable<
-  { name: string; maxPlayers: number },
+  { name: string; maxPlayers: number; isPrivate?: boolean },
   { success: boolean; lobbyId: string }
 >('createLobby');
 
@@ -104,6 +104,11 @@ export const callAskForCard = createCallable<
   { gameDocId: string; targetId: string; card: Card },
   { success: boolean; error?: string }
 >('askForCard');
+
+export const callPassTurnToTeammate = createCallable<
+  { gameDocId: string; teammateId: string },
+  { success: boolean; error?: string }
+>('passTurnToTeammate');
 
 export const callStartDeclaration = createCallable<
   { gameDocId: string },

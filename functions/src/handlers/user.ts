@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { checkRateLimit } from '../rateLimiter';
 import { generateUsername } from '../utils/usernameGenerator';
 import { getRandomUserColor } from '../utils/userColors';
+import { containsProfanity } from '../utils/profanityFilter';
 
 const db = admin.firestore();
 
@@ -74,6 +75,9 @@ export const updateUsername = onCall({ cors: corsOrigins, invoker: 'public' }, a
   }
   if (trimmedUsername.length > MAX_USERNAME_LENGTH) {
     throw new HttpsError('invalid-argument', `Username must be ${MAX_USERNAME_LENGTH} characters or less`);
+  }
+  if (containsProfanity(trimmedUsername)) {
+    throw new HttpsError('invalid-argument', 'Username contains inappropriate language');
   }
 
   // Check rate limit

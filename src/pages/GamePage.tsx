@@ -8,7 +8,9 @@ import {
   subscribeToGame,
   getPlayerHand,
   getOpponents,
+  getTeammates,
   askForCard,
+  passTurnToTeammate,
   belongsToHalfSuit,
   getHalfSuitFromCard,
   getCardKey,
@@ -42,7 +44,8 @@ import PlayerHand, { MobilePlayerHand } from '../components/game/PlayerHand';
 import AskCardDialog from '../components/game/AskCardDialog';
 import SelectOpponentDialog from '../components/game/SelectOpponentDialog';
 import DesktopOpponentLayout from '../components/game/DesktopOpponentLayout';
-import { TurnBanner, DeclarationBanner, LeftPlayerBanner } from '../components/game/StatusBanner';
+import { TurnBanner, DeclarationBanner, LeftPlayerBanner, PassTurnBanner } from '../components/game/StatusBanner';
+import SelectTeammateDialog from '../components/game/SelectTeammateDialog';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { Button } from "@/components/ui/button";
 import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +63,7 @@ const GamePage: React.FC = () => {
   const { isDesktop } = useBreakpoint();
 
   const [showSelectOpponent, setShowSelectOpponent] = useState(false);
+  const [showSelectTeammate, setShowSelectTeammate] = useState(false);
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const [selectedSuit, setSelectedSuit] = useState<Card['suit']>('spades');
   const [selectedRank, setSelectedRank] = useState<Card['rank']>('A');
@@ -190,6 +194,12 @@ const GamePage: React.FC = () => {
 
   const isPlayer = (!!user && game?.players?.includes(user.uid)) || false;
   const isMyTurn = (!!user && isPlayer && game && game.currentTurn === user.uid) || false;
+  const myHandIsEmpty = (!!user && isPlayer && game && (game.playerHands[user.uid]?.length || 0) === 0) || false;
+
+  const teammates = useMemo(() => {
+    if (!game || !user) return [];
+    return getTeammates(game, user.uid);
+  }, [game, user]);
 
   const serverPlayerHand = useMemo(() => {
     if (!isPlayer || !game || !user) return [];
@@ -301,6 +311,17 @@ const GamePage: React.FC = () => {
     }
 
     setIsAsking(false);
+  };
+
+  const handlePassTurnToTeammate = async (teammateId: string) => {
+    if (!user || !isPlayer || !game) return;
+
+    setShowSelectTeammate(false);
+    const result = await passTurnToTeammate(game.id, teammateId);
+
+    if (!result.success && result.error) {
+      setErrorMessage(result.error);
+    }
   };
 
   const canAskForCard = (): boolean => {
@@ -493,8 +514,13 @@ const GamePage: React.FC = () => {
             />
           )}
 
-          {/* Current Turn Banner */}
-          {!game.leftPlayer && (
+          {/* Current Turn Banner - show PassTurnBanner if it's my turn but I have no cards */}
+          {!game.leftPlayer && isMyTurn && myHandIsEmpty && !isInDeclarePhase && (
+            <PassTurnBanner
+              onPassTurnClick={() => setShowSelectTeammate(true)}
+            />
+          )}
+          {!game.leftPlayer && !(isMyTurn && myHandIsEmpty && !isInDeclarePhase) && (
             <TurnBanner
               isMyTurn={isMyTurn}
               currentTurnPlayerId={game.currentTurn}
@@ -734,6 +760,19 @@ const GamePage: React.FC = () => {
             setShowSelectOpponent(false);
           }}
           onCancel={() => setShowSelectOpponent(false)}
+          getUsername={getUsername}
+          getUserColor={getUserColor}
+        />
+      )}
+
+      {/* Select Teammate Dialog (for passing turn when you have no cards) */}
+      {game && isMyTurn && myHandIsEmpty && !isInDeclarePhase && showSelectTeammate && (
+        <SelectTeammateDialog
+          teammates={teammates}
+          teams={game.teams}
+          playerHands={game.playerHands}
+          onSelectTeammate={handlePassTurnToTeammate}
+          onCancel={() => setShowSelectTeammate(false)}
           getUsername={getUsername}
           getUserColor={getUserColor}
         />

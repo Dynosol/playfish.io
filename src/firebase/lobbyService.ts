@@ -41,12 +41,14 @@ export interface Lobby {
   historicalScores: { 0: number; 1: number };
   lastActivityAt?: number; // timestamp of last action (for inactivity detection)
   stale?: boolean; // whether the lobby is stale due to inactivity
+  isPrivate?: boolean; // private lobbies don't appear in public list but can be joined via direct link
 }
 
 export interface CreateLobbyData {
   name: string;
   createdBy: string;
   maxPlayers: number;
+  isPrivate?: boolean;
 }
 
 export const subscribeToActiveLobbies = (
@@ -60,16 +62,16 @@ export const subscribeToActiveLobbies = (
   return onSnapshot(
     lobbiesQuery,
     (snapshot) => {
-      console.log('Received lobbies snapshot:', snapshot.docs.length, 'lobbies');
-      const lobbiesList = snapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-          createdAt: toDate(data.createdAt)
-        } as Lobby;
-      });
-      console.log('Lobbies list:', lobbiesList);
+      const lobbiesList = snapshot.docs
+        .map(docSnap => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            ...data,
+            createdAt: toDate(data.createdAt)
+          } as Lobby;
+        })
+        .filter(lobby => !lobby.isPrivate); // Filter out private lobbies
       callback(lobbiesList);
     },
     (error) => {
@@ -85,7 +87,6 @@ export const subscribeToLobby = (
   callback: (lobby: Lobby | null) => void
 ): (() => void) => {
   return onSnapshot(doc(db, 'lobbies', lobbyId), (docSnapshot) => {
-    console.log('Received lobby snapshot for', lobbyId, ':', docSnapshot.exists());
     if (docSnapshot.exists()) {
       const data = docSnapshot.data();
       const lobbyData = {
@@ -93,10 +94,8 @@ export const subscribeToLobby = (
         ...data,
         createdAt: toDate(data.createdAt)
       } as Lobby;
-      console.log('Lobby data:', lobbyData);
       callback(lobbyData);
     } else {
-      console.log('Lobby does not exist');
       callback(null);
     }
   });
@@ -108,7 +107,8 @@ export const subscribeToLobby = (
 export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> => {
   const result = await callCreateLobby({
     name: lobbyData.name,
-    maxPlayers: lobbyData.maxPlayers
+    maxPlayers: lobbyData.maxPlayers,
+    isPrivate: lobbyData.isPrivate
   });
   return result.lobbyId;
 };

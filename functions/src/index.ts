@@ -31,6 +31,7 @@ export {
 
 export {
   askForCard,
+  passTurnToTeammate,
   startDeclaration,
   abortDeclaration,
   selectDeclarationHalfSuit,

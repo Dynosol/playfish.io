@@ -42,6 +42,7 @@ const rateLimiter_1 = require("../rateLimiter");
 const game_1 = require("./game");
 const usernameGenerator_1 = require("../utils/usernameGenerator");
 const userColors_1 = require("../utils/userColors");
+const profanityFilter_1 = require("../utils/profanityFilter");
 const db = admin.firestore();
 const corsOrigins = ['https://playfish.io', 'http://localhost:5173', 'http://localhost:3000'];
 // Validation constants
@@ -139,13 +140,7 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
     }
     const userId = request.auth.uid;
     const { name, maxPlayers } = request.data;
-    // Validate input
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        throw new https_1.HttpsError('invalid-argument', 'Lobby name is required');
-    }
-    if (name.trim().length > exports.MAX_LOBBY_NAME_LENGTH) {
-        throw new https_1.HttpsError('invalid-argument', `Lobby name must be ${exports.MAX_LOBBY_NAME_LENGTH} characters or less`);
-    }
+    // Validate maxPlayers
     if (!maxPlayers || typeof maxPlayers !== 'number' || maxPlayers < 2 || maxPlayers > 6) {
         throw new https_1.HttpsError('invalid-argument', 'maxPlayers must be between 2 and 6');
     }
@@ -168,9 +163,22 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         throw new https_1.HttpsError('internal', 'Failed to generate unique lobby ID');
     }
     const uuid = require('crypto').randomUUID();
+    const { isPrivate } = request.data;
+    // Determine lobby name: use provided name or default to lobbyId
+    let lobbyName = lobbyId;
+    if (name && typeof name === 'string' && name.trim().length > 0) {
+        const trimmedName = name.trim();
+        if (trimmedName.length > exports.MAX_LOBBY_NAME_LENGTH) {
+            throw new https_1.HttpsError('invalid-argument', `Lobby name must be ${exports.MAX_LOBBY_NAME_LENGTH} characters or less`);
+        }
+        if ((0, profanityFilter_1.containsProfanity)(trimmedName)) {
+            throw new https_1.HttpsError('invalid-argument', 'Lobby name contains inappropriate language');
+        }
+        lobbyName = trimmedName;
+    }
     const lobbyRef = db.collection('lobbies').doc(lobbyId);
     await lobbyRef.set({
-        name: name.trim(),
+        name: lobbyName,
         createdBy: userId,
         maxPlayers,
         uuid,
@@ -181,7 +189,8 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         historicalScores: { 0: 0, 1: 0 },
         createdAt: firestore_1.FieldValue.serverTimestamp(),
         lastActivityAt: Date.now(),
-        stale: false
+        stale: false,
+        isPrivate: isPrivate || false
     });
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true, lobbyId };

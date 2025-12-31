@@ -29,6 +29,7 @@ interface Declaration {
   team: 0 | 1;
   assignments: { [cardKey: string]: string };
   correct: boolean;
+  forfeit: boolean; // true if team had all cards but wrong distribution (neither team scores)
   timestamp: Date;
 }
 
@@ -73,7 +74,7 @@ const suits: Card['suit'][] = ['spades', 'hearts', 'diamonds', 'clubs'];
 const ranks: Card['rank'][] = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
 
 const getHalfSuitFromCard = (suit: Card['suit'], rank: Card['rank']): string => {
-  const lowRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6'];
+  const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7'];
   const isLow = lowRanks.includes(rank);
   const prefix = isLow ? 'low' : 'high';
   return `${prefix}-${suit}`;
@@ -83,8 +84,8 @@ const getAllCardsInHalfSuit = (halfSuit: string): Card[] => {
   const [lowOrHigh, suit] = halfSuit.split('-') as [string, Card['suit']];
   const isLow = lowOrHigh === 'low';
   const ranksForHalfSuit: Card['rank'][] = isLow
-    ? ['A', '2', '3', '4', '5', '6']
-    : ['7', '9', '10', 'J', 'Q', 'K'];
+    ? ['2', '3', '4', '5', '6', '7']
+    : ['9', '10', 'J', 'Q', 'K', 'A'];
 
   return ranksForHalfSuit.map(rank => ({
     suit,
@@ -295,6 +296,10 @@ export const askForCard = onCall({ cors: corsOrigins, invoker: 'public' }, async
     const askerHand = game.playerHands[askerId] || [];
     const targetHand = game.playerHands[targetId] || [];
 
+    if (targetHand.length === 0) {
+      throw new HttpsError('failed-precondition', 'You cannot ask a player who has no cards');
+    }
+
     if (hasCard(askerHand, card)) {
       throw new HttpsError('failed-precondition', 'You already have this card');
     }
@@ -321,6 +326,71 @@ export const askForCard = onCall({ cors: corsOrigins, invoker: 'public' }, async
       turns: [...game.turns, newTurn],
       lastActivityAt: Date.now(),
       ...(shouldClearLeftPlayer && { leftPlayer: null })
+    });
+
+    return { success: true };
+  });
+});
+
+interface PassTurnToTeammateData {
+  gameDocId: string;
+  teammateId: string;
+}
+
+export const passTurnToTeammate = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const playerId = request.auth.uid;
+  const { gameDocId, teammateId } = request.data as PassTurnToTeammateData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+  if (!teammateId || typeof teammateId !== 'string') {
+    throw new HttpsError('invalid-argument', 'teammateId is required');
+  }
+
+  await checkRateLimit(playerId, 'game:passTurnToTeammate');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (game.declarePhase?.active) {
+      throw new HttpsError('failed-precondition', 'Cannot pass turn during a declaration');
+    }
+    if (game.currentTurn !== playerId) {
+      throw new HttpsError('failed-precondition', 'It is not your turn');
+    }
+
+    const playerHand = game.playerHands[playerId] || [];
+    if (playerHand.length > 0) {
+      throw new HttpsError('failed-precondition', 'You can only pass the turn if you have no cards');
+    }
+
+    // Verify teammate is on the same team
+    if (game.teams[teammateId] !== game.teams[playerId]) {
+      throw new HttpsError('failed-precondition', 'You can only pass to a teammate');
+    }
+
+    // Verify teammate has cards
+    const teammateHand = game.playerHands[teammateId] || [];
+    if (teammateHand.length === 0) {
+      throw new HttpsError('failed-precondition', 'Teammate must have cards to receive the turn');
+    }
+
+    transaction.update(gameRef, {
+      currentTurn: teammateId,
+      lastActivityAt: Date.now()
     });
 
     return { success: true };
@@ -367,6 +437,9 @@ export const startDeclaration = onCall({ cors: corsOrigins, invoker: 'public' },
     }
     if (!isPlayerAlive(game, declareeId)) {
       throw new HttpsError('failed-precondition', 'You must have cards to declare');
+    }
+    if (game.currentTurn !== declareeId) {
+      throw new HttpsError('failed-precondition', 'You can only declare on your turn');
     }
 
     // Clear leftPlayer if this was an inactive player resuming
@@ -605,7 +678,22 @@ export const finishDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }
 
     const updatedPlayerHands = { ...game.playerHands };
     let allCorrect = true;
+    let teamHasAllCards = true;
 
+    // Check if the claimed team actually has all cards in this half-suit
+    const opposingTeamPlayers = game.players.filter(p => game.teams[p] !== team);
+    for (const card of allCardsInHalfSuit) {
+      for (const oppPlayer of opposingTeamPlayers) {
+        const oppHand = updatedPlayerHands[oppPlayer] || [];
+        if (hasCard(oppHand, card)) {
+          teamHasAllCards = false;
+          break;
+        }
+      }
+      if (!teamHasAllCards) break;
+    }
+
+    // Check if the distribution among teammates is correct
     for (const card of allCardsInHalfSuit) {
       const assignedHand = updatedPlayerHands[assignments[getCardKey(card)]] || [];
       if (!hasCard(assignedHand, card)) allCorrect = false;
@@ -618,18 +706,30 @@ export const finishDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }
     const declareeTeam = game.teams[declareeId];
     const oppositeTeam = declareeTeam === 0 ? 1 : 0;
     const updatedScores = { ...game.scores };
-    updatedScores[allCorrect ? declareeTeam : oppositeTeam]++;
+
+    // Scoring logic:
+    // - Correct declaration → declaring team wins
+    // - Opponent has a card → opposing team wins
+    // - Team has all cards but wrong distribution → forfeit (neither scores)
+    if (allCorrect) {
+      updatedScores[declareeTeam]++;
+    } else if (!teamHasAllCards) {
+      updatedScores[oppositeTeam]++;
+    }
+    // If teamHasAllCards but !allCorrect → forfeit, no score change
 
     let gameOver = game.gameOver;
     const wasGameOver = gameOver !== null;
     if (updatedScores[0] >= 5) gameOver = { winner: 0 };
     else if (updatedScores[1] >= 5) gameOver = { winner: 1 };
 
+    const isForfeit = !allCorrect && teamHasAllCards;
+
     transaction.update(gameRef, {
       playerHands: updatedPlayerHands,
       scores: updatedScores,
       completedHalfsuits: [...game.completedHalfsuits, halfSuit],
-      declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, timestamp: new Date() }],
+      declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, forfeit: isForfeit, timestamp: new Date() }],
       declarePhase: null,
       gameOver,
       lastActivityAt: Date.now()

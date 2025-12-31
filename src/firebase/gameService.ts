@@ -6,6 +6,7 @@ import {
 import { db } from './config';
 import {
   callAskForCard,
+  callPassTurnToTeammate,
   callStartDeclaration,
   callAbortDeclaration,
   callSelectDeclarationHalfSuit,
@@ -38,6 +39,7 @@ export interface Declaration {
   team: 0 | 1;
   assignments: { [cardKey: string]: string };
   correct: boolean;
+  forfeit?: boolean; // true if team had all cards but wrong distribution (neither team scores)
   timestamp: Date;
 }
 
@@ -80,7 +82,7 @@ export interface Game {
 // Game creation and card distribution is handled by Cloud Functions
 
 export const getHalfSuitFromCard = (suit: Card['suit'], rank: Card['rank']): Card['halfSuit'] => {
-  const lowRanks: Card['rank'][] = ['A', '2', '3', '4', '5', '6'];
+  const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7'];
   const isLow = lowRanks.includes(rank);
   const prefix = isLow ? 'low' : 'high';
   return `${prefix}-${suit}` as Card['halfSuit'];
@@ -89,9 +91,9 @@ export const getHalfSuitFromCard = (suit: Card['suit'], rank: Card['rank']): Car
 export const getAllCardsInHalfSuit = (halfSuit: Card['halfSuit']): Card[] => {
   const [lowOrHigh, suit] = halfSuit.split('-') as [string, Card['suit']];
   const isLow = lowOrHigh === 'low';
-  const ranksForHalfSuit: Card['rank'][] = isLow 
-    ? ['A', '2', '3', '4', '5', '6']
-    : ['7', '9', '10', 'J', 'Q', 'K'];
+  const ranksForHalfSuit: Card['rank'][] = isLow
+    ? ['2', '3', '4', '5', '6', '7']
+    : ['9', '10', 'J', 'Q', 'K', 'A'];
   
   return ranksForHalfSuit.map(rank => ({
     suit,
@@ -151,6 +153,14 @@ export const getPlayerTeam = (game: Game, playerId: string): 0 | 1 | undefined =
   return game.teams[playerId];
 };
 
+// Get all teammate player IDs for a given player (excluding the player themselves)
+export const getTeammates = (game: Game, playerId: string): string[] => {
+  const playerTeam = game.teams[playerId];
+  if (playerTeam === undefined) return [];
+
+  return game.players.filter(p => p !== playerId && game.teams[p] === playerTeam);
+};
+
 export const belongsToHalfSuit = (hand: Card[], halfSuit: Card['halfSuit']): boolean => {
   return hand.some(card => card.halfSuit === halfSuit);
 };
@@ -185,6 +195,18 @@ export const askForCard = async (
     return await callAskForCard({ gameDocId, targetId, card });
   } catch (error) {
     console.error('Error in askForCard:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const passTurnToTeammate = async (
+  gameDocId: string,
+  teammateId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callPassTurnToTeammate({ gameDocId, teammateId });
+  } catch (error) {
+    console.error('Error in passTurnToTeammate:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

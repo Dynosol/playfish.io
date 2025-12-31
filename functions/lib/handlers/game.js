@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
+exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.passTurnToTeammate = exports.askForCard = exports.createGame = exports.archiveCompletedGameFromLobby = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -47,7 +47,7 @@ const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 const suits = ['spades', 'hearts', 'diamonds', 'clubs'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '9', '10', 'J', 'Q', 'K'];
 const getHalfSuitFromCard = (suit, rank) => {
-    const lowRanks = ['A', '2', '3', '4', '5', '6'];
+    const lowRanks = ['2', '3', '4', '5', '6', '7'];
     const isLow = lowRanks.includes(rank);
     const prefix = isLow ? 'low' : 'high';
     return `${prefix}-${suit}`;
@@ -56,8 +56,8 @@ const getAllCardsInHalfSuit = (halfSuit) => {
     const [lowOrHigh, suit] = halfSuit.split('-');
     const isLow = lowOrHigh === 'low';
     const ranksForHalfSuit = isLow
-        ? ['A', '2', '3', '4', '5', '6']
-        : ['7', '9', '10', 'J', 'Q', 'K'];
+        ? ['2', '3', '4', '5', '6', '7']
+        : ['9', '10', 'J', 'Q', 'K', 'A'];
     return ranksForHalfSuit.map(rank => ({
         suit,
         rank,
@@ -225,6 +225,9 @@ exports.askForCard = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' 
         }
         const askerHand = game.playerHands[askerId] || [];
         const targetHand = game.playerHands[targetId] || [];
+        if (targetHand.length === 0) {
+            throw new https_1.HttpsError('failed-precondition', 'You cannot ask a player who has no cards');
+        }
         if (hasCard(askerHand, card)) {
             throw new https_1.HttpsError('failed-precondition', 'You already have this card');
         }
@@ -246,6 +249,52 @@ exports.askForCard = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' 
             turns: [...game.turns, newTurn],
             lastActivityAt: Date.now(),
             ...(shouldClearLeftPlayer && { leftPlayer: null })
+        });
+        return { success: true };
+    });
+});
+exports.passTurnToTeammate = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const playerId = request.auth.uid;
+    const { gameDocId, teammateId } = request.data;
+    if (!gameDocId || typeof gameDocId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'gameDocId is required');
+    }
+    if (!teammateId || typeof teammateId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'teammateId is required');
+    }
+    await (0, rateLimiter_1.checkRateLimit)(playerId, 'game:passTurnToTeammate');
+    const gameRef = db.collection('games').doc(gameDocId);
+    return await db.runTransaction(async (transaction) => {
+        const gameSnap = await transaction.get(gameRef);
+        if (!gameSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Game not found');
+        }
+        const game = { id: gameSnap.id, ...gameSnap.data() };
+        if (game.declarePhase?.active) {
+            throw new https_1.HttpsError('failed-precondition', 'Cannot pass turn during a declaration');
+        }
+        if (game.currentTurn !== playerId) {
+            throw new https_1.HttpsError('failed-precondition', 'It is not your turn');
+        }
+        const playerHand = game.playerHands[playerId] || [];
+        if (playerHand.length > 0) {
+            throw new https_1.HttpsError('failed-precondition', 'You can only pass the turn if you have no cards');
+        }
+        // Verify teammate is on the same team
+        if (game.teams[teammateId] !== game.teams[playerId]) {
+            throw new https_1.HttpsError('failed-precondition', 'You can only pass to a teammate');
+        }
+        // Verify teammate has cards
+        const teammateHand = game.playerHands[teammateId] || [];
+        if (teammateHand.length === 0) {
+            throw new https_1.HttpsError('failed-precondition', 'Teammate must have cards to receive the turn');
+        }
+        transaction.update(gameRef, {
+            currentTurn: teammateId,
+            lastActivityAt: Date.now()
         });
         return { success: true };
     });
@@ -278,6 +327,9 @@ exports.startDeclaration = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'pu
         }
         if (!isPlayerAlive(game, declareeId)) {
             throw new https_1.HttpsError('failed-precondition', 'You must have cards to declare');
+        }
+        if (game.currentTurn !== declareeId) {
+            throw new https_1.HttpsError('failed-precondition', 'You can only declare on your turn');
         }
         // Clear leftPlayer if this was an inactive player resuming
         const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === declareeId;
@@ -445,6 +497,21 @@ exports.finishDeclaration = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'p
         }
         const updatedPlayerHands = { ...game.playerHands };
         let allCorrect = true;
+        let teamHasAllCards = true;
+        // Check if the claimed team actually has all cards in this half-suit
+        const opposingTeamPlayers = game.players.filter(p => game.teams[p] !== team);
+        for (const card of allCardsInHalfSuit) {
+            for (const oppPlayer of opposingTeamPlayers) {
+                const oppHand = updatedPlayerHands[oppPlayer] || [];
+                if (hasCard(oppHand, card)) {
+                    teamHasAllCards = false;
+                    break;
+                }
+            }
+            if (!teamHasAllCards)
+                break;
+        }
+        // Check if the distribution among teammates is correct
         for (const card of allCardsInHalfSuit) {
             const assignedHand = updatedPlayerHands[assignments[getCardKey(card)]] || [];
             if (!hasCard(assignedHand, card))
@@ -456,18 +523,29 @@ exports.finishDeclaration = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'p
         const declareeTeam = game.teams[declareeId];
         const oppositeTeam = declareeTeam === 0 ? 1 : 0;
         const updatedScores = { ...game.scores };
-        updatedScores[allCorrect ? declareeTeam : oppositeTeam]++;
+        // Scoring logic:
+        // - Correct declaration → declaring team wins
+        // - Opponent has a card → opposing team wins
+        // - Team has all cards but wrong distribution → forfeit (neither scores)
+        if (allCorrect) {
+            updatedScores[declareeTeam]++;
+        }
+        else if (!teamHasAllCards) {
+            updatedScores[oppositeTeam]++;
+        }
+        // If teamHasAllCards but !allCorrect → forfeit, no score change
         let gameOver = game.gameOver;
         const wasGameOver = gameOver !== null;
         if (updatedScores[0] >= 5)
             gameOver = { winner: 0 };
         else if (updatedScores[1] >= 5)
             gameOver = { winner: 1 };
+        const isForfeit = !allCorrect && teamHasAllCards;
         transaction.update(gameRef, {
             playerHands: updatedPlayerHands,
             scores: updatedScores,
             completedHalfsuits: [...game.completedHalfsuits, halfSuit],
-            declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, timestamp: new Date() }],
+            declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, forfeit: isForfeit, timestamp: new Date() }],
             declarePhase: null,
             gameOver,
             lastActivityAt: Date.now()
