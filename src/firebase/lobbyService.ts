@@ -23,6 +23,7 @@ import {
   callLeaveTeam,
   callSwapPlayerTeam,
   callRandomizeTeams,
+  callUpdateLobbySettings,
   callStartLobby,
   callReturnToLobby
 } from './functionsClient';
@@ -42,6 +43,7 @@ export interface Lobby {
   lastActivityAt?: number; // timestamp of last action (for inactivity detection)
   stale?: boolean; // whether the lobby is stale due to inactivity
   isPrivate?: boolean; // private lobbies don't appear in public list but can be joined via direct link
+  challengeMode?: boolean; // whether challenges are enabled for games in this lobby
 }
 
 export interface CreateLobbyData {
@@ -49,6 +51,7 @@ export interface CreateLobbyData {
   createdBy: string;
   maxPlayers: number;
   isPrivate?: boolean;
+  challengeMode?: boolean;
 }
 
 export const subscribeToActiveLobbies = (
@@ -108,7 +111,8 @@ export const createLobby = async (lobbyData: CreateLobbyData): Promise<string> =
   const result = await callCreateLobby({
     name: lobbyData.name,
     maxPlayers: lobbyData.maxPlayers,
-    isPrivate: lobbyData.isPrivate
+    isPrivate: lobbyData.isPrivate,
+    challengeMode: lobbyData.challengeMode
   });
   return result.lobbyId;
 };
@@ -158,6 +162,10 @@ export const areTeamsEven = (lobby: Lobby): boolean => {
 
 export const randomizeTeams = async (lobbyId: string, _playerId: string): Promise<void> => {
   await callRandomizeTeams({ lobbyId });
+};
+
+export const updateLobbySettings = async (lobbyId: string, settings: { challengeMode?: boolean }): Promise<void> => {
+  await callUpdateLobbySettings({ lobbyId, ...settings });
 };
 
 export const startLobby = async (lobbyId: string): Promise<void> => {

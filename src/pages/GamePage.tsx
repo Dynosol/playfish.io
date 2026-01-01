@@ -9,6 +9,7 @@ import {
   getPlayerHand,
   getOpponents,
   getTeammates,
+  getPlayerTeam,
   askForCard,
   passTurnToTeammate,
   belongsToHalfSuit,
@@ -23,6 +24,9 @@ import {
   voteForReplay,
   leaveGame,
   forfeitGame,
+  startChallenge,
+  abortChallenge,
+  respondToChallenge,
   LEAVE_TIMEOUT_SECONDS,
   type Card
 } from '../firebase/gameService';
@@ -44,7 +48,9 @@ import PlayerHand, { MobilePlayerHand } from '../components/game/PlayerHand';
 import AskCardDialog from '../components/game/AskCardDialog';
 import SelectOpponentDialog from '../components/game/SelectOpponentDialog';
 import DesktopOpponentLayout from '../components/game/DesktopOpponentLayout';
-import { TurnBanner, DeclarationBanner, LeftPlayerBanner, PassTurnBanner } from '../components/game/StatusBanner';
+import { TurnBanner, DeclarationBanner, LeftPlayerBanner, PassTurnBanner, ChallengeBanner } from '../components/game/StatusBanner';
+import ChallengeHalfSuitDialog from '../components/game/ChallengeHalfSuitDialog';
+import ChallengeResponsePopup from '../components/game/ChallengeResponsePopup';
 import SelectTeammateDialog from '../components/game/SelectTeammateDialog';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { Button } from "@/components/ui/button";
@@ -78,6 +84,8 @@ const GamePage: React.FC = () => {
   const [leaveCountdown, setLeaveCountdown] = useState<number | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [showChallengeDialog, setShowChallengeDialog] = useState(false);
+  const [challengeTimeRemaining, setChallengeTimeRemaining] = useState(30);
 
   // Track window width continuously for responsive card sizing
   useEffect(() => {
@@ -186,6 +194,25 @@ const GamePage: React.FC = () => {
     return () => clearInterval(interval);
   }, [game?.leftPlayer, game?.gameOver, lobby?.onGoingGame]);
 
+  // Handle challenge countdown timer
+  useEffect(() => {
+    if (!game?.challengePhase?.active) {
+      setChallengeTimeRemaining(30);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const elapsed = Date.now() - game.challengePhase!.startedAt;
+      const remaining = Math.max(0, 30 - Math.floor(elapsed / 1000));
+      setChallengeTimeRemaining(remaining);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [game?.challengePhase?.active, game?.challengePhase?.startedAt]);
+
   const playersArray = useMemo(() => game?.players || [], [game?.players]);
   const usersData = useUsers(playersArray);
 
@@ -195,6 +222,32 @@ const GamePage: React.FC = () => {
   const isPlayer = (!!user && game?.players?.includes(user.uid)) || false;
   const isMyTurn = (!!user && isPlayer && game && game.currentTurn === user.uid) || false;
   const myHandIsEmpty = (!!user && isPlayer && game && (game.playerHands[user.uid]?.length || 0) === 0) || false;
+
+  // Challenge mode computed values
+  const myTeam = user && game ? getPlayerTeam(game, user.uid) : undefined;
+  const isInChallengePhase = game?.challengePhase?.active || false;
+  const isChallenger = isPlayer && game?.challengePhase?.challengerId === user?.uid;
+  const isChallengedTeam = isPlayer && game?.challengePhase?.challengedTeam === myTeam;
+  const challengerMustDeclare = game?.challengePhase?.challengerMustDeclare || false;
+  const myResponse = user && game?.challengePhase?.responses ? game.challengePhase.responses[user.uid] : null;
+
+  // Can challenge: challenge mode enabled, not my turn, opponent hasn't acted, no active phases
+  const canChallenge = !!(
+    game?.challengeMode &&
+    isPlayer &&
+    !isMyTurn &&
+    !game?.turnActed &&
+    !game?.declarePhase?.active &&
+    !game?.challengePhase?.active &&
+    !game?.gameOver
+  );
+
+  // Check if player has cards in the challenged half-suit (for declare button)
+  const hasCardsInChallengedHalfSuit = useMemo(() => {
+    if (!game?.challengePhase?.selectedHalfSuit || !user) return false;
+    const hand = game.playerHands[user.uid] || [];
+    return hand.some(card => card.halfSuit === game.challengePhase!.selectedHalfSuit);
+  }, [game?.challengePhase?.selectedHalfSuit, game?.playerHands, user]);
 
   const teammates = useMemo(() => {
     if (!game || !user) return [];
@@ -434,6 +487,39 @@ const GamePage: React.FC = () => {
     setIsDeclaring(false);
   };
 
+  // Challenge handlers
+  const handleStartChallenge = async (halfSuit: Card['halfSuit']) => {
+    if (!isPlayer || !game || !user) return;
+
+    setShowChallengeDialog(false);
+
+    const result = await startChallenge(game.id, halfSuit);
+
+    if (!result.success && result.error) {
+      setDeclareError(result.error);
+    }
+  };
+
+  const handleAbortChallenge = async () => {
+    if (!isPlayer || !game || !user) return;
+
+    const result = await abortChallenge(game.id);
+
+    if (!result.success && result.error) {
+      setDeclareError(result.error);
+    }
+  };
+
+  const handleRespondToChallenge = async (response: 'pass' | 'declare') => {
+    if (!isPlayer || !game || !user) return;
+
+    const result = await respondToChallenge(game.id, response);
+
+    if (!result.success && result.error) {
+      setDeclareError(result.error);
+    }
+  };
+
   const isInDeclarePhase = game.declarePhase?.active || false;
   const isDeclaree = isPlayer && game.declarePhase?.declareeId === user?.uid;
   const isGameOver = game.gameOver?.winner !== null && game.gameOver?.winner !== undefined;
@@ -537,6 +623,18 @@ const GamePage: React.FC = () => {
               isDeclaree={isDeclaree}
               declareeId={game.declarePhase?.declareeId || ''}
               getUsername={getUsername}
+            />
+          )}
+
+          {/* Challenge Banner */}
+          {isInChallengePhase && game.challengePhase && (
+            <ChallengeBanner
+              isChallenger={isChallenger}
+              isChallengedTeam={isChallengedTeam}
+              challengerMustDeclare={challengerMustDeclare}
+              challengerName={getUsername(game.challengePhase.challengerId)}
+              halfSuit={game.challengePhase.selectedHalfSuit}
+              timeRemaining={challengeTimeRemaining}
             />
           )}
         </>
@@ -698,14 +796,17 @@ const GamePage: React.FC = () => {
             isPlayer={isPlayer}
             isMyTurn={isMyTurn}
             isInDeclarePhase={isInDeclarePhase}
+            isInChallengePhase={isInChallengePhase}
             isGameOver={isGameOver}
             isDeclaring={isDeclaring}
             declareError={declareError}
             isPlayerAlive={isPlayerAlive(game, user?.uid || '')}
             hasLeftPlayer={!!game.leftPlayer}
+            canChallenge={canChallenge}
             onLeaveGame={() => setShowLeaveConfirm(true)}
             onReturnToLobby={handleReturnToLobby}
             onDeclare={handleDeclare}
+            onChallenge={() => setShowChallengeDialog(true)}
             onAsk={() => setShowSelectOpponent(true)}
             onShuffle={handleShuffle}
             onSort={handleSort}
@@ -730,14 +831,17 @@ const GamePage: React.FC = () => {
             isPlayer={isPlayer}
             isMyTurn={isMyTurn}
             isInDeclarePhase={isInDeclarePhase}
+            isInChallengePhase={isInChallengePhase}
             isGameOver={isGameOver}
             isDeclaring={isDeclaring}
             declareError={declareError}
             onLeaveGame={() => setShowLeaveConfirm(true)}
             onReturnToLobby={handleReturnToLobby}
             onDeclare={handleDeclare}
+            onChallenge={() => setShowChallengeDialog(true)}
             onAsk={() => setShowSelectOpponent(true)}
             isPlayerAlive={isPlayerAlive(game, user?.uid || '')}
+            canChallenge={canChallenge}
             onShuffle={handleShuffle}
             onSort={handleSort}
             sortToast={toast}
@@ -790,6 +894,28 @@ const GamePage: React.FC = () => {
         }}
         onCancel={() => setShowLeaveConfirm(false)}
       />
+
+      {/* Challenge Half-Suit Selection Dialog */}
+      {showChallengeDialog && game && (
+        <ChallengeHalfSuitDialog
+          completedHalfsuits={game.completedHalfsuits}
+          onSelect={handleStartChallenge}
+          onCancel={() => setShowChallengeDialog(false)}
+        />
+      )}
+
+      {/* Challenge Response Popup for challenged team members */}
+      {isInChallengePhase && isChallengedTeam && !challengerMustDeclare && game?.challengePhase && myResponse === null && (
+        <ChallengeResponsePopup
+          challengePhase={game.challengePhase}
+          challengerName={getUsername(game.challengePhase.challengerId)}
+          myResponse={myResponse}
+          timeRemaining={challengeTimeRemaining}
+          canDeclare={hasCardsInChallengedHalfSuit}
+          onPass={() => handleRespondToChallenge('pass')}
+          onDeclare={() => handleRespondToChallenge('declare')}
+        />
+      )}
     </div>
   );
 };

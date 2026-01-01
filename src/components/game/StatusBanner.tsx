@@ -185,4 +185,58 @@ export const LeftPlayerBanner: React.FC<LeftPlayerBannerProps> = ({
   );
 };
 
+interface ChallengeBannerProps {
+  isChallenger: boolean;
+  isChallengedTeam: boolean;
+  challengerMustDeclare: boolean;
+  challengerName: string;
+  halfSuit: string;
+  timeRemaining: number;
+}
+
+export const ChallengeBanner: React.FC<ChallengeBannerProps> = ({
+  isChallenger,
+  isChallengedTeam,
+  challengerMustDeclare,
+  challengerName,
+  halfSuit,
+  timeRemaining,
+}) => {
+  const [level, suit] = halfSuit.split('-');
+  const formattedHalfSuit = `${level} ${suit}`;
+
+  if (isChallenger) {
+    if (challengerMustDeclare) {
+      return (
+        <StatusBanner backgroundColor={colors.amber}>
+          <span className="font-semibold">All passed! You must declare {formattedHalfSuit}!</span>
+        </StatusBanner>
+      );
+    }
+    return (
+      <StatusBanner backgroundColor={colors.amber}>
+        Waiting for response to your challenge ({formattedHalfSuit})...
+        <span className="font-semibold ml-1">{timeRemaining}s</span>
+      </StatusBanner>
+    );
+  }
+
+  if (isChallengedTeam) {
+    return (
+      <StatusBanner backgroundColor={colors.amber}>
+        <span className="font-semibold">{challengerName}</span> challenged your team!
+        Respond within <span className="font-semibold">{timeRemaining}s</span>
+      </StatusBanner>
+    );
+  }
+
+  // Observer from challenger's team
+  return (
+    <StatusBanner backgroundColor={colors.amber}>
+      <span className="font-semibold">{challengerName}</span> challenged the opposing team!
+      <span className="ml-1">{timeRemaining}s</span>
+    </StatusBanner>
+  );
+};
+
 export default StatusBanner;

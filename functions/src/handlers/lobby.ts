@@ -30,6 +30,7 @@ interface Lobby {
   lastActivityAt?: number;
   stale?: boolean;
   isPrivate?: boolean;
+  challengeMode?: boolean;
 }
 
 // Word lists for lobby ID generation
@@ -137,6 +138,7 @@ interface CreateLobbyData {
   name?: string;
   maxPlayers: number;
   isPrivate?: boolean;
+  challengeMode?: boolean;
 }
 
 export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
@@ -176,7 +178,7 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
 
   const uuid = require('crypto').randomUUID();
 
-  const { isPrivate } = request.data as CreateLobbyData;
+  const { isPrivate, challengeMode } = request.data as CreateLobbyData;
 
   // Determine lobby name: use provided name or default to lobbyId
   let lobbyName = lobbyId;
@@ -205,7 +207,8 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
     createdAt: FieldValue.serverTimestamp(),
     lastActivityAt: Date.now(),
     stale: false,
-    isPrivate: isPrivate || false
+    isPrivate: isPrivate || false,
+    challengeMode: challengeMode || false
   });
 
   await updateUserCurrentLobby(userId, lobbyId);
@@ -582,6 +585,61 @@ export const randomizeTeams = onCall({ cors: corsOrigins, invoker: 'public' }, a
   return { success: true };
 });
 
+interface UpdateLobbySettingsData {
+  lobbyId: string;
+  challengeMode?: boolean;
+}
+
+export const updateLobbySettings = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const userId = request.auth.uid;
+  const { lobbyId, challengeMode } = request.data as UpdateLobbySettingsData;
+
+  if (!lobbyId || typeof lobbyId !== 'string') {
+    throw new HttpsError('invalid-argument', 'lobbyId is required');
+  }
+
+  // Check rate limit
+  await checkRateLimit(userId, 'lobby:updateLobbySettings');
+
+  const lobbyRef = db.collection('lobbies').doc(lobbyId);
+
+  await db.runTransaction(async (transaction) => {
+    const lobbySnap = await transaction.get(lobbyRef);
+
+    if (!lobbySnap.exists) {
+      throw new HttpsError('not-found', 'Lobby not found');
+    }
+
+    const lobbyData = lobbySnap.data() as Lobby;
+
+    // Only host can update settings
+    if (lobbyData.createdBy !== userId) {
+      throw new HttpsError('permission-denied', 'Only the host can update lobby settings');
+    }
+
+    if (lobbyData.status !== 'waiting') {
+      throw new HttpsError('failed-precondition', 'Cannot change settings while game is in progress');
+    }
+
+    const updateData: Record<string, unknown> = {
+      lastActivityAt: Date.now(),
+      stale: false
+    };
+
+    if (typeof challengeMode === 'boolean') {
+      updateData.challengeMode = challengeMode;
+    }
+
+    transaction.update(lobbyRef, updateData);
+  });
+
+  return { success: true };
+});
+
 interface StartLobbyData {
   lobbyId: string;
 }
@@ -628,7 +686,7 @@ export const startLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async
     teamAssignments[playerId] = team;
   }
 
-  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId);
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, lobbyData.challengeMode || false);
 
   await lobbyRef.update({
     status: 'playing',

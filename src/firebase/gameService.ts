@@ -15,7 +15,10 @@ import {
   callVoteForReplay,
   callLeaveGame,
   callReturnToGame,
-  callForfeitGame
+  callForfeitGame,
+  callStartChallenge,
+  callAbortChallenge,
+  callRespondToChallenge
 } from './functionsClient';
 
 export interface Card {
@@ -56,6 +59,17 @@ export interface LeftPlayer {
   reason?: 'left' | 'inactive'; // why the player is marked as left
 }
 
+export interface ChallengePhase {
+  active: boolean;
+  challengerId: string;
+  challengedTeam: 0 | 1;
+  selectedHalfSuit: Card['halfSuit'];
+  responses: { [playerId: string]: 'pass' | 'declare' | null };
+  declareRaceWinner?: string;
+  startedAt: number;
+  challengerMustDeclare?: boolean;
+}
+
 export interface Game {
   id: string;
   uuid: string; // Unique game identifier (persists in historical collections)
@@ -71,6 +85,9 @@ export interface Game {
   completedHalfsuits: Card['halfSuit'][];
   declarations: Declaration[];
   declarePhase: DeclarePhase | null;
+  challengeMode?: boolean;
+  turnActed?: boolean;
+  challengePhase?: ChallengePhase | null;
   gameOver: { winner: 0 | 1 | null } | null;
   replayVotes: string[];
   leftPlayer: LeftPlayer | null;
@@ -323,6 +340,42 @@ export const forfeitGame = async (
     return await callForfeitGame({ gameDocId });
   } catch (error) {
     console.error('Error in forfeitGame:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+// Challenge functions
+export const startChallenge = async (
+  gameDocId: string,
+  halfSuit: Card['halfSuit']
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callStartChallenge({ gameDocId, halfSuit });
+  } catch (error) {
+    console.error('Error in startChallenge:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const abortChallenge = async (
+  gameDocId: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    return await callAbortChallenge({ gameDocId });
+  } catch (error) {
+    console.error('Error in abortChallenge:', error);
+    return { success: false, error: 'An error occurred' };
+  }
+};
+
+export const respondToChallenge = async (
+  gameDocId: string,
+  response: 'pass' | 'declare'
+): Promise<{ success: boolean; error?: string; wonRace?: boolean }> => {
+  try {
+    return await callRespondToChallenge({ gameDocId, response });
+  } catch (error) {
+    console.error('Error in respondToChallenge:', error);
     return { success: false, error: 'An error occurred' };
   }
 };

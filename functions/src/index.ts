@@ -24,6 +24,7 @@ export {
   leaveTeam,
   swapPlayerTeam,
   randomizeTeams,
+  updateLobbySettings,
   startLobby,
   returnToLobby,
   checkInactiveLobbies
@@ -41,5 +42,8 @@ export {
   leaveGame,
   returnToGame,
   forfeitGame,
-  checkInactiveGames
+  checkInactiveGames,
+  startChallenge,
+  abortChallenge,
+  respondToChallenge
 } from './handlers/game';

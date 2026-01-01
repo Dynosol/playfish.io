@@ -39,6 +39,17 @@ interface LeftPlayer {
   reason?: 'left' | 'inactive';
 }
 
+interface ChallengePhase {
+  active: boolean;
+  challengerId: string;
+  challengedTeam: 0 | 1;
+  selectedHalfSuit: string;
+  responses: { [playerId: string]: 'pass' | 'declare' | null };
+  declareRaceWinner?: string;
+  startedAt: number;
+  challengerMustDeclare?: boolean;
+}
+
 interface Game {
   id: string;
   uuid: string;
@@ -64,6 +75,9 @@ interface Game {
   leftPlayer: LeftPlayer | null;
   createdAt: Date;
   lastActivityAt: number; // timestamp of last action
+  challengeMode: boolean;
+  turnActed: boolean; // true after askForCard or startDeclaration
+  challengePhase: ChallengePhase | null;
 }
 
 const LEAVE_TIMEOUT_SECONDS = 60;
@@ -202,7 +216,8 @@ export const createGame = async (
   gameId: string,
   players: string[],
   teamAssignments: { [playerId: string]: 0 | 1 },
-  lobbyUuid: string
+  lobbyUuid: string,
+  challengeMode: boolean = false
 ): Promise<string> => {
   const playerHands = distributeCards(players);
   const teams = { ...teamAssignments };
@@ -230,7 +245,10 @@ export const createGame = async (
     replayVotes: [],
     leftPlayer: null,
     createdAt: FieldValue.serverTimestamp(),
-    lastActivityAt: Date.now()
+    lastActivityAt: Date.now(),
+    challengeMode,
+    turnActed: false,
+    challengePhase: null
   };
 
   const docRef = await db.collection('games').add(gameData);
@@ -277,6 +295,9 @@ export const askForCard = onCall({ cors: corsOrigins, invoker: 'public' }, async
 
     if (game.declarePhase?.active) {
       throw new HttpsError('failed-precondition', 'Game is paused during declaration phase');
+    }
+    if (game.challengePhase?.active) {
+      throw new HttpsError('failed-precondition', 'Game is paused during challenge phase');
     }
     if (game.leftPlayer) {
       // Allow action if it's the inactive player making a move (clears the pause)
@@ -325,6 +346,9 @@ export const askForCard = onCall({ cors: corsOrigins, invoker: 'public' }, async
       currentTurn: targetHasCard ? askerId : targetId,
       turns: [...game.turns, newTurn],
       lastActivityAt: Date.now(),
+      turnActed: true,
+      // Reset turnActed when turn passes to opponent
+      ...(targetHasCard === false && { turnActed: false }),
       ...(shouldClearLeftPlayer && { leftPlayer: null })
     });
 
@@ -429,6 +453,9 @@ export const startDeclaration = onCall({ cors: corsOrigins, invoker: 'public' },
     if (game.declarePhase?.active) {
       throw new HttpsError('failed-precondition', 'A declaration is already in progress');
     }
+    if (game.challengePhase?.active) {
+      throw new HttpsError('failed-precondition', 'A challenge is in progress');
+    }
     if (game.leftPlayer) {
       // Allow action if it's the inactive player making a move (clears the pause)
       if (game.leftPlayer.reason !== 'inactive' || game.leftPlayer.odId !== declareeId) {
@@ -448,6 +475,7 @@ export const startDeclaration = onCall({ cors: corsOrigins, invoker: 'public' },
     transaction.update(gameRef, {
       declarePhase: { active: true, declareeId },
       lastActivityAt: Date.now(),
+      turnActed: true,
       ...(shouldClearLeftPlayer && { leftPlayer: null })
     });
 
@@ -731,6 +759,8 @@ export const finishDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }
       completedHalfsuits: [...game.completedHalfsuits, halfSuit],
       declarations: [...game.declarations, { declareeId, halfSuit, team, assignments, correct: allCorrect, forfeit: isForfeit, timestamp: new Date() }],
       declarePhase: null,
+      challengePhase: null, // Clear challenge phase after declaration completes
+      turnActed: false, // Reset for next turn
       gameOver,
       lastActivityAt: Date.now()
     });
@@ -752,6 +782,254 @@ export const finishDeclaration = onCall({ cors: corsOrigins, invoker: 'public' }
   }
 
   return { success: true };
+});
+
+// ============== CHALLENGE MODE FUNCTIONS ==============
+
+const CHALLENGE_TIMEOUT_MS = 30 * 1000; // 30 seconds
+
+interface StartChallengeData {
+  gameDocId: string;
+  halfSuit: string;
+}
+
+export const startChallenge = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const challengerId = request.auth.uid;
+  const { gameDocId, halfSuit } = request.data as StartChallengeData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+  if (!halfSuit || typeof halfSuit !== 'string') {
+    throw new HttpsError('invalid-argument', 'halfSuit is required');
+  }
+
+  await checkRateLimit(challengerId, 'game:startChallenge');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    // Validate challenge conditions
+    if (!game.challengeMode) {
+      throw new HttpsError('failed-precondition', 'Challenge mode is not enabled');
+    }
+    if (game.gameOver) {
+      throw new HttpsError('failed-precondition', 'Game is already over');
+    }
+    if (game.declarePhase?.active) {
+      throw new HttpsError('failed-precondition', 'A declaration is in progress');
+    }
+    if (game.challengePhase?.active) {
+      throw new HttpsError('failed-precondition', 'A challenge is already in progress');
+    }
+    if (game.leftPlayer) {
+      throw new HttpsError('failed-precondition', 'Game is paused - a player has left');
+    }
+    if (game.currentTurn === challengerId) {
+      throw new HttpsError('failed-precondition', 'You cannot challenge on your own turn');
+    }
+    if (game.turnActed) {
+      throw new HttpsError('failed-precondition', 'Cannot challenge after opponent has acted');
+    }
+    if (!isPlayerAlive(game, challengerId)) {
+      throw new HttpsError('failed-precondition', 'You must have cards to challenge');
+    }
+    if (game.completedHalfsuits.includes(halfSuit)) {
+      throw new HttpsError('failed-precondition', 'This half-suit has already been completed');
+    }
+
+    // Get the team being challenged (the team whose turn it is)
+    const challengedTeam = game.teams[game.currentTurn];
+    const challengedPlayers = getTeamPlayers(game, challengedTeam);
+
+    // Initialize responses for all challenged players
+    const responses: { [playerId: string]: 'pass' | 'declare' | null } = {};
+    for (const playerId of challengedPlayers) {
+      responses[playerId] = null;
+    }
+
+    transaction.update(gameRef, {
+      challengePhase: {
+        active: true,
+        challengerId,
+        challengedTeam,
+        selectedHalfSuit: halfSuit,
+        responses,
+        startedAt: Date.now()
+      },
+      lastActivityAt: Date.now()
+    });
+
+    return { success: true };
+  });
+});
+
+interface AbortChallengeData {
+  gameDocId: string;
+}
+
+export const abortChallenge = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const challengerId = request.auth.uid;
+  const { gameDocId } = request.data as AbortChallengeData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+
+  await checkRateLimit(challengerId, 'game:abortChallenge');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.challengePhase?.active) {
+      throw new HttpsError('failed-precondition', 'No challenge is in progress');
+    }
+    if (game.challengePhase.challengerId !== challengerId) {
+      throw new HttpsError('permission-denied', 'You are not the challenger');
+    }
+
+    // Can only abort if no one has responded yet
+    const hasAnyResponse = Object.values(game.challengePhase.responses).some(r => r !== null);
+    if (hasAnyResponse) {
+      throw new HttpsError('failed-precondition', 'Cannot abort after someone has responded');
+    }
+
+    transaction.update(gameRef, {
+      challengePhase: null,
+      lastActivityAt: Date.now()
+    });
+
+    return { success: true };
+  });
+});
+
+interface RespondToChallengeData {
+  gameDocId: string;
+  response: 'pass' | 'declare';
+}
+
+export const respondToChallenge = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const playerId = request.auth.uid;
+  const { gameDocId, response } = request.data as RespondToChallengeData;
+
+  if (!gameDocId || typeof gameDocId !== 'string') {
+    throw new HttpsError('invalid-argument', 'gameDocId is required');
+  }
+  if (response !== 'pass' && response !== 'declare') {
+    throw new HttpsError('invalid-argument', 'response must be "pass" or "declare"');
+  }
+
+  await checkRateLimit(playerId, 'game:respondToChallenge');
+
+  const gameRef = db.collection('games').doc(gameDocId);
+
+  return await db.runTransaction(async (transaction) => {
+    const gameSnap = await transaction.get(gameRef);
+
+    if (!gameSnap.exists) {
+      throw new HttpsError('not-found', 'Game not found');
+    }
+
+    const game = { id: gameSnap.id, ...gameSnap.data() } as Game;
+
+    if (!game.challengePhase?.active) {
+      throw new HttpsError('failed-precondition', 'No challenge is in progress');
+    }
+    if (game.teams[playerId] !== game.challengePhase.challengedTeam) {
+      throw new HttpsError('permission-denied', 'You are not on the challenged team');
+    }
+    if (game.challengePhase.responses[playerId] !== null) {
+      throw new HttpsError('failed-precondition', 'You have already responded');
+    }
+
+    const updatedResponses = { ...game.challengePhase.responses };
+
+    if (response === 'declare') {
+      // Check if someone already won the race to declare
+      if (game.challengePhase.declareRaceWinner) {
+        throw new HttpsError('failed-precondition', 'Another player is already declaring');
+      }
+      // Must have cards to declare
+      if (!isPlayerAlive(game, playerId)) {
+        throw new HttpsError('failed-precondition', 'You must have cards to declare');
+      }
+
+      // This player wins the race to declare
+      updatedResponses[playerId] = 'declare';
+
+      transaction.update(gameRef, {
+        'challengePhase.responses': updatedResponses,
+        'challengePhase.declareRaceWinner': playerId,
+        // Set up declare phase for this player
+        declarePhase: {
+          active: true,
+          declareeId: playerId,
+          selectedHalfSuit: game.challengePhase.selectedHalfSuit,
+          selectedTeam: game.challengePhase.challengedTeam
+        },
+        lastActivityAt: Date.now()
+      });
+
+    } else {
+      // Player passes
+      updatedResponses[playerId] = 'pass';
+
+      // Check if all challenged players have passed
+      const challengedPlayers = getTeamPlayers(game, game.challengePhase.challengedTeam);
+      const allPassed = challengedPlayers.every(p => updatedResponses[p] === 'pass');
+
+      if (allPassed) {
+        // Challenger must now declare the opposing team's cards
+        transaction.update(gameRef, {
+          'challengePhase.responses': updatedResponses,
+          'challengePhase.challengerMustDeclare': true,
+          // Set up declare phase for challenger to declare opponent's cards
+          declarePhase: {
+            active: true,
+            declareeId: game.challengePhase.challengerId,
+            selectedHalfSuit: game.challengePhase.selectedHalfSuit,
+            selectedTeam: game.challengePhase.challengedTeam // Challenger declares for the opposing team
+          },
+          lastActivityAt: Date.now()
+        });
+      } else {
+        transaction.update(gameRef, {
+          'challengePhase.responses': updatedResponses,
+          lastActivityAt: Date.now()
+        });
+      }
+    }
+
+    return { success: true };
+  });
 });
 
 interface VoteForReplayData {
@@ -817,7 +1095,7 @@ export const voteForReplay = onCall({ cors: corsOrigins, invoker: 'public' }, as
     const teamAssignments: { [pid: string]: 0 | 1 } = {};
     result.game.players.forEach(pid => { teamAssignments[pid] = result.game.teams[pid]; });
 
-    const newGameDocId = await createGame(result.game.gameId, result.game.players, teamAssignments, result.game.lobbyUuid);
+    const newGameDocId = await createGame(result.game.gameId, result.game.players, teamAssignments, result.game.lobbyUuid, result.game.challengeMode || false);
 
     await result.lobbyRef.update({
       status: 'playing',
@@ -1025,6 +1303,51 @@ export const checkInactiveGames = onSchedule('every 1 minutes', async () => {
 
   for (const gameDoc of gamesSnapshot.docs) {
     const game = { id: gameDoc.id, ...gameDoc.data() } as Game;
+
+    // Handle challenge timeout (30 seconds)
+    if (game.challengePhase?.active && !game.declarePhase?.active) {
+      const challengeElapsed = now - game.challengePhase.startedAt;
+      if (challengeElapsed >= CHALLENGE_TIMEOUT_MS) {
+        // Auto-pass for any players who haven't responded
+        const updatedResponses = { ...game.challengePhase.responses };
+        let changed = false;
+
+        for (const playerId of Object.keys(updatedResponses)) {
+          if (updatedResponses[playerId] === null) {
+            updatedResponses[playerId] = 'pass';
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          // Check if all have now passed
+          const allPassed = Object.values(updatedResponses).every(r => r === 'pass');
+
+          if (allPassed) {
+            // Challenger must now declare
+            await gameDoc.ref.update({
+              'challengePhase.responses': updatedResponses,
+              'challengePhase.challengerMustDeclare': true,
+              declarePhase: {
+                active: true,
+                declareeId: game.challengePhase.challengerId,
+                selectedHalfSuit: game.challengePhase.selectedHalfSuit,
+                selectedTeam: game.challengePhase.challengedTeam
+              },
+              lastActivityAt: now
+            });
+            console.log(`Challenge timeout in game ${game.id} - all players auto-passed, challenger must declare`);
+          } else {
+            await gameDoc.ref.update({
+              'challengePhase.responses': updatedResponses,
+              lastActivityAt: now
+            });
+            console.log(`Challenge timeout in game ${game.id} - some players auto-passed`);
+          }
+        }
+        continue;
+      }
+    }
 
     // Skip if game is in declare phase (declaree is working on declaration)
     if (game.declarePhase?.active) {

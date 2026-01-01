@@ -64,14 +64,17 @@ interface GameInfoSheetProps {
   isPlayer: boolean;
   isMyTurn: boolean;
   isInDeclarePhase: boolean;
+  isInChallengePhase?: boolean;
   isGameOver: boolean;
   isDeclaring: boolean;
   declareError: string;
   onLeaveGame: () => void;
   onReturnToLobby: () => void;
   onDeclare: () => void;
+  onChallenge?: () => void;
   onAsk: () => void;
   isPlayerAlive: boolean;
+  canChallenge?: boolean;
   onShuffle?: () => void;
   onSort?: () => void;
   sortToast?: { message: string; visible: boolean };
@@ -85,14 +88,17 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
   isPlayer,
   isMyTurn,
   isInDeclarePhase,
+  isInChallengePhase = false,
   isGameOver,
   isDeclaring,
   declareError,
   onLeaveGame,
   onReturnToLobby,
   onDeclare,
+  onChallenge,
   onAsk,
   isPlayerAlive,
+  canChallenge = false,
   onShuffle,
   onSort,
   sortToast,
@@ -198,29 +204,50 @@ export const GameInfoSheet: React.FC<GameInfoSheetProps> = ({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div>
-                        <Button
-                          onClick={onDeclare}
-                          disabled={isDeclaring || isInDeclarePhase || !isPlayer || !isPlayerAlive}
-                          size="sm"
-                          className={cn(
-                            "text-xs h-8 font-semibold transition-all text-white relative",
-                            (isDeclaring || isInDeclarePhase || !isPlayerAlive)
-                              ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
-                              : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
-                          )}
-                          style={{ backgroundColor: colors.purple }}
-                        >
-                          {isDeclaring ? 'STARTING...' : 'DECLARE'}
-                        </Button>
+                        {canChallenge && onChallenge ? (
+                          <Button
+                            onClick={onChallenge}
+                            disabled={isInDeclarePhase || isInChallengePhase || !isPlayer}
+                            size="sm"
+                            className={cn(
+                              "text-xs h-8 font-semibold transition-all text-white relative",
+                              (isInDeclarePhase || isInChallengePhase)
+                                ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
+                                : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
+                            )}
+                            style={{ backgroundColor: colors.amber }}
+                          >
+                            CHALLENGE
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={onDeclare}
+                            disabled={isDeclaring || isInDeclarePhase || isInChallengePhase || !isPlayer || !isPlayerAlive}
+                            size="sm"
+                            className={cn(
+                              "text-xs h-8 font-semibold transition-all text-white relative",
+                              (isDeclaring || isInDeclarePhase || isInChallengePhase || !isPlayerAlive)
+                                ? "opacity-70 cursor-not-allowed before:absolute before:left-2 before:right-2 before:top-1/2 before:h-[2px] before:bg-current before:-translate-y-1/2"
+                                : "hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]"
+                            )}
+                            style={{ backgroundColor: colors.purple }}
+                          >
+                            {isDeclaring ? 'STARTING...' : 'DECLARE'}
+                          </Button>
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>
-                        {!isPlayerAlive
-                          ? 'You have no cards'
-                          : isInDeclarePhase
-                            ? 'Declaration in progress'
-                            : 'Are you sure?'}
+                        {canChallenge
+                          ? 'Challenge opponent to declare'
+                          : !isPlayerAlive
+                            ? 'You have no cards'
+                            : isInDeclarePhase
+                              ? 'Declaration in progress'
+                              : isInChallengePhase
+                                ? 'Challenge in progress'
+                                : 'Are you sure?'}
                       </p>
                     </TooltipContent>
                   </Tooltip>

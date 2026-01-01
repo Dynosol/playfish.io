@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.passTurnToTeammate = exports.askForCard = exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.submitFeedback = exports.sendMessage = void 0;
+exports.respondToChallenge = exports.abortChallenge = exports.startChallenge = exports.checkInactiveGames = exports.forfeitGame = exports.returnToGame = exports.leaveGame = exports.voteForReplay = exports.finishDeclaration = exports.selectDeclarationTeam = exports.selectDeclarationHalfSuit = exports.abortDeclaration = exports.startDeclaration = exports.passTurnToTeammate = exports.askForCard = exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.updateLobbySettings = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.updateUserCurrentLobby = exports.updateUserLastOnline = exports.updateUsername = exports.createOrUpdateUser = exports.submitFeedback = exports.sendMessage = void 0;
 const admin = __importStar(require("firebase-admin"));
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -56,6 +56,7 @@ Object.defineProperty(exports, "joinTeam", { enumerable: true, get: function () 
 Object.defineProperty(exports, "leaveTeam", { enumerable: true, get: function () { return lobby_1.leaveTeam; } });
 Object.defineProperty(exports, "swapPlayerTeam", { enumerable: true, get: function () { return lobby_1.swapPlayerTeam; } });
 Object.defineProperty(exports, "randomizeTeams", { enumerable: true, get: function () { return lobby_1.randomizeTeams; } });
+Object.defineProperty(exports, "updateLobbySettings", { enumerable: true, get: function () { return lobby_1.updateLobbySettings; } });
 Object.defineProperty(exports, "startLobby", { enumerable: true, get: function () { return lobby_1.startLobby; } });
 Object.defineProperty(exports, "returnToLobby", { enumerable: true, get: function () { return lobby_1.returnToLobby; } });
 Object.defineProperty(exports, "checkInactiveLobbies", { enumerable: true, get: function () { return lobby_1.checkInactiveLobbies; } });
@@ -72,4 +73,7 @@ Object.defineProperty(exports, "leaveGame", { enumerable: true, get: function ()
 Object.defineProperty(exports, "returnToGame", { enumerable: true, get: function () { return game_1.returnToGame; } });
 Object.defineProperty(exports, "forfeitGame", { enumerable: true, get: function () { return game_1.forfeitGame; } });
 Object.defineProperty(exports, "checkInactiveGames", { enumerable: true, get: function () { return game_1.checkInactiveGames; } });
+Object.defineProperty(exports, "startChallenge", { enumerable: true, get: function () { return game_1.startChallenge; } });
+Object.defineProperty(exports, "abortChallenge", { enumerable: true, get: function () { return game_1.abortChallenge; } });
+Object.defineProperty(exports, "respondToChallenge", { enumerable: true, get: function () { return game_1.respondToChallenge; } });
 //# sourceMappingURL=index.js.map

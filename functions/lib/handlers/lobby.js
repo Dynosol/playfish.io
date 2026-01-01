@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.MAX_LOBBY_NAME_LENGTH = void 0;
+exports.checkInactiveLobbies = exports.returnToLobby = exports.startLobby = exports.updateLobbySettings = exports.randomizeTeams = exports.swapPlayerTeam = exports.leaveTeam = exports.joinTeam = exports.deleteLobby = exports.leaveLobby = exports.joinLobby = exports.createLobby = exports.MAX_LOBBY_NAME_LENGTH = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -163,7 +163,7 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         throw new https_1.HttpsError('internal', 'Failed to generate unique lobby ID');
     }
     const uuid = require('crypto').randomUUID();
-    const { isPrivate } = request.data;
+    const { isPrivate, challengeMode } = request.data;
     // Determine lobby name: use provided name or default to lobbyId
     let lobbyName = lobbyId;
     if (name && typeof name === 'string' && name.trim().length > 0) {
@@ -190,7 +190,8 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         createdAt: firestore_1.FieldValue.serverTimestamp(),
         lastActivityAt: Date.now(),
         stale: false,
-        isPrivate: isPrivate || false
+        isPrivate: isPrivate || false,
+        challengeMode: challengeMode || false
     });
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true, lobbyId };
@@ -447,6 +448,42 @@ exports.randomizeTeams = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'publ
     });
     return { success: true };
 });
+exports.updateLobbySettings = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const userId = request.auth.uid;
+    const { lobbyId, challengeMode } = request.data;
+    if (!lobbyId || typeof lobbyId !== 'string') {
+        throw new https_1.HttpsError('invalid-argument', 'lobbyId is required');
+    }
+    // Check rate limit
+    await (0, rateLimiter_1.checkRateLimit)(userId, 'lobby:updateLobbySettings');
+    const lobbyRef = db.collection('lobbies').doc(lobbyId);
+    await db.runTransaction(async (transaction) => {
+        const lobbySnap = await transaction.get(lobbyRef);
+        if (!lobbySnap.exists) {
+            throw new https_1.HttpsError('not-found', 'Lobby not found');
+        }
+        const lobbyData = lobbySnap.data();
+        // Only host can update settings
+        if (lobbyData.createdBy !== userId) {
+            throw new https_1.HttpsError('permission-denied', 'Only the host can update lobby settings');
+        }
+        if (lobbyData.status !== 'waiting') {
+            throw new https_1.HttpsError('failed-precondition', 'Cannot change settings while game is in progress');
+        }
+        const updateData = {
+            lastActivityAt: Date.now(),
+            stale: false
+        };
+        if (typeof challengeMode === 'boolean') {
+            updateData.challengeMode = challengeMode;
+        }
+        transaction.update(lobbyRef, updateData);
+    });
+    return { success: true };
+});
 exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
@@ -479,7 +516,7 @@ exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' 
         }
         teamAssignments[playerId] = team;
     }
-    const gameDocId = await (0, game_1.createGame)(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId);
+    const gameDocId = await (0, game_1.createGame)(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, lobbyData.challengeMode || false);
     await lobbyRef.update({
         status: 'playing',
         onGoingGame: gameDocId,

@@ -50,7 +50,7 @@ export const callUpdateUserCurrentLobby = createCallable<
 
 // Lobby functions
 export const callCreateLobby = createCallable<
-  { name: string; maxPlayers: number; isPrivate?: boolean },
+  { name: string; maxPlayers: number; isPrivate?: boolean; challengeMode?: boolean },
   { success: boolean; lobbyId: string }
 >('createLobby');
 
@@ -88,6 +88,11 @@ export const callRandomizeTeams = createCallable<
   { lobbyId: string },
   { success: boolean }
 >('randomizeTeams');
+
+export const callUpdateLobbySettings = createCallable<
+  { lobbyId: string; challengeMode?: boolean },
+  { success: boolean }
+>('updateLobbySettings');
 
 export const callStartLobby = createCallable<
   { lobbyId: string },
@@ -154,6 +159,22 @@ export const callForfeitGame = createCallable<
   { gameDocId: string },
   { success: boolean; error?: string }
 >('forfeitGame');
+
+// Challenge functions
+export const callStartChallenge = createCallable<
+  { gameDocId: string; halfSuit: string },
+  { success: boolean; error?: string }
+>('startChallenge');
+
+export const callAbortChallenge = createCallable<
+  { gameDocId: string },
+  { success: boolean; error?: string }
+>('abortChallenge');
+
+export const callRespondToChallenge = createCallable<
+  { gameDocId: string; response: 'pass' | 'declare' },
+  { success: boolean; error?: string; wonRace?: boolean }
+>('respondToChallenge');
 
 // Feedback functions
 export const callSubmitFeedback = createCallable<

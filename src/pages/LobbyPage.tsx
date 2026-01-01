@@ -4,7 +4,8 @@ import { Crown, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentSession } from '../contexts/CurrentSessionContext';
 import SEO from '@/components/SEO';
-import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, leaveTeam, swapPlayerTeam, areTeamsEven, randomizeTeams } from '../firebase/lobbyService';
+import { leaveLobby, deleteLobby, subscribeToLobby, joinLobby, startLobby, joinTeam, leaveTeam, swapPlayerTeam, areTeamsEven, randomizeTeams, updateLobbySettings } from '../firebase/lobbyService';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Lobby } from '../firebase/lobbyService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
@@ -155,6 +156,16 @@ const LobbyPage: React.FC = () => {
       await randomizeTeams(gameId, user.uid);
     } catch (error) {
       console.error('Failed to randomize teams:', error);
+    }
+  };
+
+  const handleToggleChallengeMode = async () => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await updateLobbySettings(gameId, { challengeMode: !lobby.challengeMode });
+    } catch (error) {
+      console.error('Failed to toggle challenge mode:', error);
     }
   };
 
@@ -381,6 +392,37 @@ const LobbyPage: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Challenge Mode Toggle - visible to all, editable by host only */}
+                  {lobby.status === 'waiting' && (
+                    <div className="flex items-center justify-between py-1 border-t border-b border-gray-100">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm font-medium cursor-help">
+                              Challenge Mode
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <p>Players can challenge opponents to declare a half-suit before they act on their turn</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={lobby.challengeMode || false}
+                        onClick={handleToggleChallengeMode}
+                        disabled={!isHost}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        style={{ backgroundColor: lobby.challengeMode ? colors.amber : '#d1d5db' }}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          lobby.challengeMode ? 'translate-x-4' : 'translate-x-0.5'
+                        }`} />
+                      </button>
+                    </div>
+                  )}
 
                   <LobbyControls
                     isHost={isHost}
