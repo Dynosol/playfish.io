@@ -93,6 +93,10 @@ export interface Game {
   leftPlayer: LeftPlayer | null;
   createdAt: Date;
   lastActivityAt?: number; // timestamp of last action (for inactivity detection)
+  bluffQuestions?: boolean; // allow asking for cards you already hold
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime'; // who can declare when
+  harshDeclarations?: boolean; // wrong distribution = opponent scores (default true)
+  highSuitsDouble?: boolean; // high half-suits worth 2 points
 }
 
 // Archive functions are now handled by Cloud Functions

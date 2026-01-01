@@ -44,6 +44,10 @@ export interface Lobby {
   stale?: boolean; // whether the lobby is stale due to inactivity
   isPrivate?: boolean; // private lobbies don't appear in public list but can be joined via direct link
   challengeMode?: boolean; // whether challenges are enabled for games in this lobby
+  bluffQuestions?: boolean; // allow asking for cards you already hold
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime'; // who can declare when
+  harshDeclarations?: boolean; // wrong distribution = opponent scores (default true)
+  highSuitsDouble?: boolean; // high half-suits worth 2 points
 }
 
 export interface CreateLobbyData {
@@ -52,6 +56,10 @@ export interface CreateLobbyData {
   maxPlayers: number;
   isPrivate?: boolean;
   challengeMode?: boolean;
+  bluffQuestions?: boolean;
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+  harshDeclarations?: boolean;
+  highSuitsDouble?: boolean;
 }
 
 export const subscribeToActiveLobbies = (
@@ -164,7 +172,16 @@ export const randomizeTeams = async (lobbyId: string, _playerId: string): Promis
   await callRandomizeTeams({ lobbyId });
 };
 
-export const updateLobbySettings = async (lobbyId: string, settings: { challengeMode?: boolean }): Promise<void> => {
+export const updateLobbySettings = async (
+  lobbyId: string,
+  settings: {
+    challengeMode?: boolean;
+    bluffQuestions?: boolean;
+    declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+    harshDeclarations?: boolean;
+    highSuitsDouble?: boolean;
+  }
+): Promise<void> => {
   await callUpdateLobbySettings({ lobbyId, ...settings });
 };
 

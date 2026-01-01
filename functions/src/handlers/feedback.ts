@@ -35,11 +35,15 @@ export const submitFeedback = onCall({ cors: corsOrigins, invoker: 'public' }, a
   // Check rate limit (1 per minute)
   await checkRateLimit(userId, 'feedback:submitFeedback');
 
-  // Get IP address from request
+  // Get IP address from request (x-forwarded-for is most reliable for Cloud Run)
   const forwardedFor = request.rawRequest?.headers?.['x-forwarded-for'];
-  const ipAddress = request.rawRequest?.ip ||
-    (typeof forwardedFor === 'string' ? forwardedFor : forwardedFor?.[0]) ||
-    'unknown';
+  let ipAddress = 'unknown';
+  if (typeof forwardedFor === 'string' && forwardedFor) {
+    // x-forwarded-for can be comma-separated; first IP is the client
+    ipAddress = forwardedFor.split(',')[0].trim();
+  } else if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+    ipAddress = forwardedFor[0].split(',')[0].trim();
+  }
 
   // Get username for context
   const userDoc = await db.collection('users').doc(userId).get();

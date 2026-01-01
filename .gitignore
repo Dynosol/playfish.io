@@ -1,3 +1,4 @@
+
 claude.md
 *CLAUDE*
 
@@ -29,3 +30,4 @@ dist-ssr
 
 # Root-level images
 /*.png
+/*.svg

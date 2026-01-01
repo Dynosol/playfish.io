@@ -163,7 +163,7 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         throw new https_1.HttpsError('internal', 'Failed to generate unique lobby ID');
     }
     const uuid = require('crypto').randomUUID();
-    const { isPrivate, challengeMode } = request.data;
+    const { isPrivate, challengeMode, bluffQuestions, declarationMode, harshDeclarations, highSuitsDouble } = request.data;
     // Determine lobby name: use provided name or default to lobbyId
     let lobbyName = lobbyId;
     if (name && typeof name === 'string' && name.trim().length > 0) {
@@ -191,7 +191,11 @@ exports.createLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
         lastActivityAt: Date.now(),
         stale: false,
         isPrivate: isPrivate || false,
-        challengeMode: challengeMode || false
+        challengeMode: challengeMode || false,
+        bluffQuestions: bluffQuestions || false,
+        declarationMode: declarationMode || 'own-turn',
+        harshDeclarations: harshDeclarations !== false, // default true
+        highSuitsDouble: highSuitsDouble || false
     });
     await updateUserCurrentLobby(userId, lobbyId);
     return { success: true, lobbyId };
@@ -453,7 +457,7 @@ exports.updateLobbySettings = (0, https_1.onCall)({ cors: corsOrigins, invoker: 
         throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
     }
     const userId = request.auth.uid;
-    const { lobbyId, challengeMode } = request.data;
+    const { lobbyId, challengeMode, bluffQuestions, declarationMode, harshDeclarations, highSuitsDouble } = request.data;
     if (!lobbyId || typeof lobbyId !== 'string') {
         throw new https_1.HttpsError('invalid-argument', 'lobbyId is required');
     }
@@ -479,6 +483,18 @@ exports.updateLobbySettings = (0, https_1.onCall)({ cors: corsOrigins, invoker: 
         };
         if (typeof challengeMode === 'boolean') {
             updateData.challengeMode = challengeMode;
+        }
+        if (typeof bluffQuestions === 'boolean') {
+            updateData.bluffQuestions = bluffQuestions;
+        }
+        if (declarationMode && ['own-turn', 'team-turn', 'anytime'].includes(declarationMode)) {
+            updateData.declarationMode = declarationMode;
+        }
+        if (typeof harshDeclarations === 'boolean') {
+            updateData.harshDeclarations = harshDeclarations;
+        }
+        if (typeof highSuitsDouble === 'boolean') {
+            updateData.highSuitsDouble = highSuitsDouble;
         }
         transaction.update(lobbyRef, updateData);
     });
@@ -516,7 +532,13 @@ exports.startLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' 
         }
         teamAssignments[playerId] = team;
     }
-    const gameDocId = await (0, game_1.createGame)(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, lobbyData.challengeMode || false);
+    const gameDocId = await (0, game_1.createGame)(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, {
+        challengeMode: lobbyData.challengeMode || false,
+        bluffQuestions: lobbyData.bluffQuestions || false,
+        declarationMode: lobbyData.declarationMode || 'own-turn',
+        harshDeclarations: lobbyData.harshDeclarations !== false, // default true
+        highSuitsDouble: lobbyData.highSuitsDouble || false
+    });
     await lobbyRef.update({
         status: 'playing',
         onGoingGame: gameDocId,

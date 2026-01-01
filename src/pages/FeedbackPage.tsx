@@ -82,14 +82,11 @@ const FeedbackPage: React.FC = () => {
           ) : (
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label htmlFor="feedback" className="block text-sm font-medium mb-2">
-                  Your feedback
-                </label>
                 <textarea
                   id="feedback"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
                   rows={6}
-                  placeholder="Tell us what you think..."
+                  placeholder="Found a bug? Want a feature added? Just want to say hi? Use this box for whatever you need..."
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   disabled={submitting}
@@ -115,7 +112,7 @@ const FeedbackPage: React.FC = () => {
                 style={{ backgroundColor: submitting ? colors.grayMedium : colors.purple }}
                 disabled={submitting || !message.trim()}
               >
-                {submitting ? 'Submitting...' : 'Submit Feedback'}
+                {submitting ? 'Submitting...' : 'Submit message'}
               </Button>
             </form>
           )}

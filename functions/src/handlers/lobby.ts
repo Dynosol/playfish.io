@@ -31,6 +31,10 @@ interface Lobby {
   stale?: boolean;
   isPrivate?: boolean;
   challengeMode?: boolean;
+  bluffQuestions?: boolean;
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+  harshDeclarations?: boolean;
+  highSuitsDouble?: boolean;
 }
 
 // Word lists for lobby ID generation
@@ -139,6 +143,10 @@ interface CreateLobbyData {
   maxPlayers: number;
   isPrivate?: boolean;
   challengeMode?: boolean;
+  bluffQuestions?: boolean;
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+  harshDeclarations?: boolean;
+  highSuitsDouble?: boolean;
 }
 
 export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
@@ -178,7 +186,7 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
 
   const uuid = require('crypto').randomUUID();
 
-  const { isPrivate, challengeMode } = request.data as CreateLobbyData;
+  const { isPrivate, challengeMode, bluffQuestions, declarationMode, harshDeclarations, highSuitsDouble } = request.data as CreateLobbyData;
 
   // Determine lobby name: use provided name or default to lobbyId
   let lobbyName = lobbyId;
@@ -208,7 +216,11 @@ export const createLobby = onCall({ cors: corsOrigins, invoker: 'public' }, asyn
     lastActivityAt: Date.now(),
     stale: false,
     isPrivate: isPrivate || false,
-    challengeMode: challengeMode || false
+    challengeMode: challengeMode || false,
+    bluffQuestions: bluffQuestions || false,
+    declarationMode: declarationMode || 'own-turn',
+    harshDeclarations: harshDeclarations !== false, // default true
+    highSuitsDouble: highSuitsDouble || false
   });
 
   await updateUserCurrentLobby(userId, lobbyId);
@@ -588,6 +600,10 @@ export const randomizeTeams = onCall({ cors: corsOrigins, invoker: 'public' }, a
 interface UpdateLobbySettingsData {
   lobbyId: string;
   challengeMode?: boolean;
+  bluffQuestions?: boolean;
+  declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+  harshDeclarations?: boolean;
+  highSuitsDouble?: boolean;
 }
 
 export const updateLobbySettings = onCall({ cors: corsOrigins, invoker: 'public' }, async (request) => {
@@ -596,7 +612,7 @@ export const updateLobbySettings = onCall({ cors: corsOrigins, invoker: 'public'
   }
 
   const userId = request.auth.uid;
-  const { lobbyId, challengeMode } = request.data as UpdateLobbySettingsData;
+  const { lobbyId, challengeMode, bluffQuestions, declarationMode, harshDeclarations, highSuitsDouble } = request.data as UpdateLobbySettingsData;
 
   if (!lobbyId || typeof lobbyId !== 'string') {
     throw new HttpsError('invalid-argument', 'lobbyId is required');
@@ -632,6 +648,18 @@ export const updateLobbySettings = onCall({ cors: corsOrigins, invoker: 'public'
 
     if (typeof challengeMode === 'boolean') {
       updateData.challengeMode = challengeMode;
+    }
+    if (typeof bluffQuestions === 'boolean') {
+      updateData.bluffQuestions = bluffQuestions;
+    }
+    if (declarationMode && ['own-turn', 'team-turn', 'anytime'].includes(declarationMode)) {
+      updateData.declarationMode = declarationMode;
+    }
+    if (typeof harshDeclarations === 'boolean') {
+      updateData.harshDeclarations = harshDeclarations;
+    }
+    if (typeof highSuitsDouble === 'boolean') {
+      updateData.highSuitsDouble = highSuitsDouble;
     }
 
     transaction.update(lobbyRef, updateData);
@@ -686,7 +714,13 @@ export const startLobby = onCall({ cors: corsOrigins, invoker: 'public' }, async
     teamAssignments[playerId] = team;
   }
 
-  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, lobbyData.challengeMode || false);
+  const gameDocId = await createGame(lobbyId, lobbyData.players, teamAssignments, lobbyData.uuid || lobbyId, {
+    challengeMode: lobbyData.challengeMode || false,
+    bluffQuestions: lobbyData.bluffQuestions || false,
+    declarationMode: lobbyData.declarationMode || 'own-turn',
+    harshDeclarations: lobbyData.harshDeclarations !== false, // default true
+    highSuitsDouble: lobbyData.highSuitsDouble || false
+  });
 
   await lobbyRef.update({
     status: 'playing',

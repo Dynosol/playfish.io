@@ -154,7 +154,7 @@ const archiveUnfinishedGame = async (gameDocId, gameData, reason) => {
     await db.collection('games').doc(gameDocId).delete();
 };
 // Exported for use by lobby handler
-const createGame = async (gameId, players, teamAssignments, lobbyUuid, challengeMode = false) => {
+const createGame = async (gameId, players, teamAssignments, lobbyUuid, options = {}) => {
     const playerHands = distributeCards(players);
     const teams = { ...teamAssignments };
     const randomIndex = Math.floor(Math.random() * players.length);
@@ -179,9 +179,13 @@ const createGame = async (gameId, players, teamAssignments, lobbyUuid, challenge
         leftPlayer: null,
         createdAt: firestore_1.FieldValue.serverTimestamp(),
         lastActivityAt: Date.now(),
-        challengeMode,
+        challengeMode: options.challengeMode || false,
         turnActed: false,
-        challengePhase: null
+        challengePhase: null,
+        bluffQuestions: options.bluffQuestions || false,
+        declarationMode: options.declarationMode || 'own-turn',
+        harshDeclarations: options.harshDeclarations !== false, // default true
+        highSuitsDouble: options.highSuitsDouble || false
     };
     const docRef = await db.collection('games').add(gameData);
     return docRef.id;
@@ -234,7 +238,8 @@ exports.askForCard = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public' 
         if (targetHand.length === 0) {
             throw new https_1.HttpsError('failed-precondition', 'You cannot ask a player who has no cards');
         }
-        if (hasCard(askerHand, card)) {
+        // Only check "already have card" if bluff mode is disabled
+        if (!game.bluffQuestions && hasCard(askerHand, card)) {
             throw new https_1.HttpsError('failed-precondition', 'You already have this card');
         }
         if (!belongsToHalfSuit(askerHand, card.halfSuit)) {
@@ -340,9 +345,17 @@ exports.startDeclaration = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'pu
         if (!isPlayerAlive(game, declareeId)) {
             throw new https_1.HttpsError('failed-precondition', 'You must have cards to declare');
         }
-        if (game.currentTurn !== declareeId) {
+        // Check turn restrictions based on declaration mode
+        const mode = game.declarationMode || 'own-turn';
+        const declareeTeam = game.teams[declareeId];
+        const currentTurnTeam = game.teams[game.currentTurn];
+        if (mode === 'own-turn' && game.currentTurn !== declareeId) {
             throw new https_1.HttpsError('failed-precondition', 'You can only declare on your turn');
         }
+        if (mode === 'team-turn' && declareeTeam !== currentTurnTeam) {
+            throw new https_1.HttpsError('failed-precondition', 'You can only declare on your team\'s turn');
+        }
+        // mode === 'anytime' → no turn restriction
         // Clear leftPlayer if this was an inactive player resuming
         const shouldClearLeftPlayer = game.leftPlayer?.reason === 'inactive' && game.leftPlayer.odId === declareeId;
         transaction.update(gameRef, {
@@ -536,24 +549,36 @@ exports.finishDeclaration = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'p
         const declareeTeam = game.teams[declareeId];
         const oppositeTeam = declareeTeam === 0 ? 1 : 0;
         const updatedScores = { ...game.scores };
+        // Calculate points for this half-suit
+        const isHighHalfSuit = halfSuit.startsWith('high-');
+        const points = (game.highSuitsDouble && isHighHalfSuit) ? 2 : 1;
+        // Calculate win threshold (majority of possible points)
+        const maxPoints = game.highSuitsDouble ? 12 : 8; // 4×2+4×1 or 8×1
+        const winThreshold = Math.floor(maxPoints / 2) + 1; // 7 or 5
         // Scoring logic:
         // - Correct declaration → declaring team wins
         // - Opponent has a card → opposing team wins
-        // - Team has all cards but wrong distribution → forfeit (neither scores)
+        // - Team has all cards but wrong distribution:
+        //   - harshDeclarations ON (default): opposing team wins
+        //   - harshDeclarations OFF: forfeit (neither scores)
         if (allCorrect) {
-            updatedScores[declareeTeam]++;
+            updatedScores[declareeTeam] += points;
         }
         else if (!teamHasAllCards) {
-            updatedScores[oppositeTeam]++;
+            updatedScores[oppositeTeam] += points;
         }
-        // If teamHasAllCards but !allCorrect → forfeit, no score change
+        else if (game.harshDeclarations !== false) {
+            // Harsh mode: wrong distribution → opponent scores
+            updatedScores[oppositeTeam] += points;
+        }
+        // else: legacy forfeit (neither scores) when harshDeclarations is explicitly false
         let gameOver = game.gameOver;
         const wasGameOver = gameOver !== null;
-        if (updatedScores[0] >= 5)
+        if (updatedScores[0] >= winThreshold)
             gameOver = { winner: 0 };
-        else if (updatedScores[1] >= 5)
+        else if (updatedScores[1] >= winThreshold)
             gameOver = { winner: 1 };
-        const isForfeit = !allCorrect && teamHasAllCards;
+        const isForfeit = !allCorrect && teamHasAllCards && game.harshDeclarations === false;
         transaction.update(gameRef, {
             playerHands: updatedPlayerHands,
             scores: updatedScores,
@@ -817,7 +842,13 @@ exports.voteForReplay = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'publi
     if (result.allNonHostVoted) {
         const teamAssignments = {};
         result.game.players.forEach(pid => { teamAssignments[pid] = result.game.teams[pid]; });
-        const newGameDocId = await (0, exports.createGame)(result.game.gameId, result.game.players, teamAssignments, result.game.lobbyUuid, result.game.challengeMode || false);
+        const newGameDocId = await (0, exports.createGame)(result.game.gameId, result.game.players, teamAssignments, result.game.lobbyUuid, {
+            challengeMode: result.game.challengeMode || false,
+            bluffQuestions: result.game.bluffQuestions || false,
+            declarationMode: result.game.declarationMode || 'own-turn',
+            harshDeclarations: result.game.harshDeclarations !== false,
+            highSuitsDouble: result.game.highSuitsDouble || false
+        });
         await result.lobbyRef.update({
             status: 'playing',
             onGoingGame: newGameDocId,

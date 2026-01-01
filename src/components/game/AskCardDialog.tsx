@@ -30,6 +30,7 @@ interface AskCardDialogProps {
   isAsking: boolean;
   errorMessage: string;
   playerHand: Card[];
+  bluffQuestions?: boolean;
 }
 
 const AskCardDialog: React.FC<AskCardDialogProps> = ({
@@ -43,10 +44,12 @@ const AskCardDialog: React.FC<AskCardDialogProps> = ({
   isAsking,
   errorMessage,
   playerHand,
+  bluffQuestions = false,
 }) => {
   const isRedSuit = (suit: Card['suit']) => suit === 'hearts' || suit === 'diamonds';
 
-  const hasCardAlready = playerHand.some(
+  // Only show "already have card" warning if bluff mode is disabled
+  const hasCardAlready = !bluffQuestions && playerHand.some(
     card => card.suit === selectedSuit && card.rank === selectedRank
   );
 

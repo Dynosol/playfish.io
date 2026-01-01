@@ -169,6 +169,46 @@ const LobbyPage: React.FC = () => {
     }
   };
 
+  const handleToggleBluffQuestions = async () => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await updateLobbySettings(gameId, { bluffQuestions: !lobby.bluffQuestions });
+    } catch (error) {
+      console.error('Failed to toggle bluff questions:', error);
+    }
+  };
+
+  const handleSetDeclarationMode = async (mode: 'own-turn' | 'team-turn' | 'anytime') => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await updateLobbySettings(gameId, { declarationMode: mode });
+    } catch (error) {
+      console.error('Failed to set declaration mode:', error);
+    }
+  };
+
+  const handleToggleHarshDeclarations = async () => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await updateLobbySettings(gameId, { harshDeclarations: !(lobby.harshDeclarations !== false) });
+    } catch (error) {
+      console.error('Failed to toggle harsh declarations:', error);
+    }
+  };
+
+  const handleToggleHighSuitsDouble = async () => {
+    if (!gameId || !lobby || lobby.createdBy !== user?.uid) return;
+
+    try {
+      await updateLobbySettings(gameId, { highSuitsDouble: !lobby.highSuitsDouble });
+    } catch (error) {
+      console.error('Failed to toggle high suits double:', error);
+    }
+  };
+
   const handleCopyInviteLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -403,34 +443,157 @@ const LobbyPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Challenge Mode Toggle - visible to all, editable by host only */}
+                  {/* Game Options - visible to all, editable by host only */}
                   {lobby.status === 'waiting' && (
-                    <div className="flex items-center justify-between py-1 border-t border-b border-gray-100">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-sm font-medium cursor-help">
-                              Challenge Mode
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-xs">
-                            <p>Players can challenge opponents to declare a half-suit before they act on their turn</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={lobby.challengeMode || false}
-                        onClick={handleToggleChallengeMode}
-                        disabled={!isHost}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        style={{ backgroundColor: lobby.challengeMode ? colors.amber : '#d1d5db' }}
-                      >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          lobby.challengeMode ? 'translate-x-4' : 'translate-x-0.5'
-                        }`} />
-                      </button>
+                    <div className="space-y-0">
+                      {/* Challenge Mode Toggle */}
+                      <div className="flex items-center justify-between py-1 border-t border-gray-100">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm font-medium cursor-help">
+                                Challenge Mode
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p>Players can challenge opponents to declare a half-suit before they act on their turn</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={lobby.challengeMode || false}
+                          onClick={handleToggleChallengeMode}
+                          disabled={!isHost}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          style={{ backgroundColor: lobby.challengeMode ? colors.amber : '#d1d5db' }}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            lobby.challengeMode ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {/* Bluff Questions Toggle */}
+                      <div className="flex items-center justify-between py-1 border-t border-gray-100">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm font-medium cursor-help">
+                                Bluff Questions
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p>Players can ask for cards they already hold (still need a card in that half-suit)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={lobby.bluffQuestions || false}
+                          onClick={handleToggleBluffQuestions}
+                          disabled={!isHost}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          style={{ backgroundColor: lobby.bluffQuestions ? colors.amber : '#d1d5db' }}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            lobby.bluffQuestions ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {/* Declaration Mode Selector */}
+                      <div className="flex items-center justify-between py-1 border-t border-gray-100">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm font-medium cursor-help">
+                                Declaration Mode
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p>Controls when players can declare half-suits</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <div className={`flex rounded overflow-hidden border ${!isHost ? 'opacity-60' : ''}`} style={{ borderColor: colors.grayLight }}>
+                          {(['own-turn', 'team-turn', 'anytime'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => handleSetDeclarationMode(mode)}
+                              disabled={!isHost}
+                              className={`px-2 py-0.5 text-xs transition-colors ${!isHost ? 'cursor-not-allowed' : ''}`}
+                              style={{
+                                backgroundColor: (lobby.declarationMode || 'own-turn') === mode ? colors.amber : 'white',
+                                color: (lobby.declarationMode || 'own-turn') === mode ? 'white' : '#374151'
+                              }}
+                            >
+                              {mode === 'own-turn' ? 'Own' : mode === 'team-turn' ? 'Team' : 'Any'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Harsh Declarations Toggle */}
+                      <div className="flex items-center justify-between py-1 border-t border-gray-100">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm font-medium cursor-help">
+                                Harsh Declarations
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p>Wrong card distribution gives the half-suit to opponents (default: on)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={lobby.harshDeclarations !== false}
+                          onClick={handleToggleHarshDeclarations}
+                          disabled={!isHost}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          style={{ backgroundColor: lobby.harshDeclarations !== false ? colors.amber : '#d1d5db' }}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            lobby.harshDeclarations !== false ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                      </div>
+
+                      {/* High Suits Double Toggle */}
+                      <div className="flex items-center justify-between py-1 border-t border-b border-gray-100">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-sm font-medium cursor-help">
+                                High Suits Double
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs">
+                              <p>High half-suits (9-A) score 2 points. Win threshold becomes 7 instead of 5.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={lobby.highSuitsDouble || false}
+                          onClick={handleToggleHighSuitsDouble}
+                          disabled={!isHost}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${!isHost ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          style={{ backgroundColor: lobby.highSuitsDouble ? colors.amber : '#d1d5db' }}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            lobby.highSuitsDouble ? 'translate-x-4' : 'translate-x-0.5'
+                          }`} />
+                        </button>
+                      </div>
                     </div>
                   )}
 

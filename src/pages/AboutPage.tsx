@@ -262,9 +262,6 @@ const AboutPage: React.FC = () => {
                 <p className="mt-3 text-gray-600">
                   This rule adds a bluffing element and prevents teams from indefinitely hoarding half-suits they've completed. It's particularly useful for breaking stalemates.
                 </p>
-                <p className="mt-3 px-4 py-2 rounded text-sm" style={{ backgroundColor: `${colors.blue}15`, color: colors.blue }}>
-                  Challenge mode is coming soon!.
-                </p>
               </section>
 
               <section className="mb-8">
@@ -274,9 +271,6 @@ const AboutPage: React.FC = () => {
                 </p>
                 <p className="mt-3 text-gray-600">
                   This variant significantly increases complexity and is not recommended for beginners. It makes the game considerably more confusing since opponents can no longer reliably deduce what cards you hold based on your questions.
-                </p>
-                <p className="mt-3 px-4 py-2 rounded text-sm" style={{ backgroundColor: `${colors.blue}15`, color: colors.blue }}>
-                  Bluff questions are coming soon!.
                 </p>
               </section>
 

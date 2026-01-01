@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Check, X, User } from 'lucide-react';
+import { X } from 'lucide-react';
 import pencilIcon from '@/assets/pencil.png';
 import questionIcon from '@/assets/questionmark.png';
 import gearIcon from '@/assets/gear.png';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from '../contexts/AuthContext';
 import { useUserDocument } from '../contexts/UserDocumentContext';
@@ -35,15 +33,11 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
   const [newUsername, setNewUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsUsername, setSettingsUsername] = useState('');
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsSuccess, setSettingsSuccess] = useState(false);
 
   // Sync local state with userDoc from context
   useEffect(() => {
     if (userDoc?.username) {
       setNewUsername(userDoc.username);
-      setSettingsUsername(userDoc.username);
     }
   }, [userDoc?.username]);
 
@@ -58,22 +52,6 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
       } finally {
           setLoading(false);
       }
-  };
-
-  const handleSaveSettingsUsername = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !settingsUsername.trim()) return;
-    setSettingsLoading(true);
-    setSettingsSuccess(false);
-    try {
-        await updateUsername(user.uid, settingsUsername);
-        setSettingsSuccess(true);
-        setTimeout(() => setSettingsSuccess(false), 3000);
-    } catch (error) {
-        console.error("Failed to update username in settings", error);
-    } finally {
-        setSettingsLoading(false);
-    }
   };
 
   const handleHomeClick = () => {
@@ -130,12 +108,8 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
                             }
                           }}
                           onBlur={() => {
-                            if (newUsername.trim().length <= MAX_USERNAME_LENGTH) {
-                              handleSaveUsername();
-                            } else {
-                              setNewUsername(userDoc?.username || '');
-                              setIsEditing(false);
-                            }
+                            setNewUsername(userDoc?.username || '');
+                            setIsEditing(false);
                           }}
                           disabled={loading}
                         />
@@ -200,70 +174,26 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
       {/* Settings Popup */}
       {showSettings && (
         <div className="fixed top-16 sm:top-20 right-3 sm:right-4 z-50 w-[calc(100vw-1.5rem)] sm:w-80 max-w-sm animate-in fade-in zoom-in-95 duration-200 slide-in-from-top-2">
-          <Card className="border border-gray-300 rounded-lg shadow-xl bg-white">
-            <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between space-y-0 border-b border-gray-200">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <img src={gearIcon} alt="Settings" className="h-5 w-5" />
+          <Card className="rounded-lg">
+            <CardHeader className="p-3 pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <img src={gearIcon} alt="Settings" className="h-4 w-4" />
                 Settings
               </CardTitle>
-              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2" onClick={() => setShowSettings(false)}>
+              <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1" onClick={() => setShowSettings(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <form onSubmit={handleSaveSettingsUsername} className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="settings-username" className="text-sm font-medium flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Username
-                  </Label>
-                  <div className="flex gap-2">
-                    <TooltipProvider>
-                      <Tooltip open={settingsUsername.trim().length > MAX_USERNAME_LENGTH}>
-                        <TooltipTrigger asChild>
-                          <Input
-                            id="settings-username"
-                            value={settingsUsername}
-                            onChange={(e) => setSettingsUsername(e.target.value)}
-                            placeholder="Enter username"
-                            maxLength={MAX_USERNAME_LENGTH + 5}
-                            className={cn(
-                              "h-9 border-gray-300 rounded-lg focus:border-gray-400",
-                              settingsUsername.trim().length > MAX_USERNAME_LENGTH && "border-red-500 focus-visible:ring-red-500"
-                            )}
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" className="bg-red-500 text-white">
-                          <p>Choose a shorter name! (max {MAX_USERNAME_LENGTH} chars)</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      className="rounded-lg"
-                      disabled={settingsLoading || settingsUsername.trim().length > MAX_USERNAME_LENGTH || settingsUsername.trim().length === 0}
-                    >
-                      {settingsLoading ? '...' : 'Save'}
-                    </Button>
-                  </div>
-                  {settingsSuccess && (
-                    <p className="text-xs text-green-600 font-medium flex items-center gap-1 animate-in fade-in slide-in-from-left-1">
-                      <Check className="h-3 w-3" /> Saved successfully
-                    </p>
-                  )}
-                </div>
-              </form>
-              <div className="border-t border-gray-200 pt-4">
-                <Link
-                  to="/feedback"
-                  onClick={() => setShowSettings(false)}
-                  className="block w-full text-center py-2 rounded-lg text-white text-sm font-medium"
-                  style={{ backgroundColor: colors.purple }}
-                >
-                  Submit Feedback
-                </Link>
-              </div>
+            <CardContent className="p-3 pt-0 space-y-3">
+              <Link
+                to="/feedback"
+                onClick={() => setShowSettings(false)}
+                className="block w-full text-center py-2 rounded text-white text-sm font-medium"
+                style={{ backgroundColor: colors.purple }}
+              >
+                Submit Feedback
+              </Link>
+              <p className="text-sm text-gray-500 italic text-center">More settings coming soon!</p>
             </CardContent>
           </Card>
         </div>

@@ -25,7 +25,6 @@ import {
   leaveGame,
   forfeitGame,
   startChallenge,
-  abortChallenge,
   respondToChallenge,
   LEAVE_TIMEOUT_SECONDS,
   type Card
@@ -384,8 +383,14 @@ const GamePage: React.FC = () => {
 
     const cardHalfSuit = getHalfSuitFromCard(selectedSuit, selectedRank);
 
-    return belongsToHalfSuit(playerHand, cardHalfSuit) &&
-           !playerHand.some(c => c.suit === selectedSuit && c.rank === selectedRank);
+    // Must belong to the half-suit
+    if (!belongsToHalfSuit(playerHand, cardHalfSuit)) return false;
+
+    // Check if we already have the card (only block if bluff mode is disabled)
+    const alreadyHaveCard = playerHand.some(c => c.suit === selectedSuit && c.rank === selectedRank);
+    if (alreadyHaveCard && !game?.bluffQuestions) return false;
+
+    return true;
   };
 
   const handleDeclare = async () => {
@@ -494,16 +499,6 @@ const GamePage: React.FC = () => {
     setShowChallengeDialog(false);
 
     const result = await startChallenge(game.id, halfSuit);
-
-    if (!result.success && result.error) {
-      setDeclareError(result.error);
-    }
-  };
-
-  const handleAbortChallenge = async () => {
-    if (!isPlayer || !game || !user) return;
-
-    const result = await abortChallenge(game.id);
 
     if (!result.success && result.error) {
       setDeclareError(result.error);
@@ -731,6 +726,7 @@ const GamePage: React.FC = () => {
                   isAsking={isAsking}
                   errorMessage={errorMessage}
                   playerHand={playerHand}
+                  bluffQuestions={game?.bluffQuestions}
                 />
               )}
             </>

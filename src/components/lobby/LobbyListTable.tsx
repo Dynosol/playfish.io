@@ -54,7 +54,7 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
 
   return (
     <Card>
-      <CardContent className="p-0 overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <CardContent className="p-0 max-h-[24rem] overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
         {lobbies.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             No active lobbies found. Create one to get started!
@@ -62,13 +62,13 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
         ) : (
           <TooltipProvider delayDuration={300}>
           <Table className="min-w-[500px]">
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-white shadow-sm">
               <TableRow className="h-8 text-xs sm:text-sm">
-                <TableHead className="py-1 whitespace-nowrap">Lobby Name</TableHead>
-                <TableHead className="py-1 whitespace-nowrap">Host</TableHead>
-                <TableHead className="py-1 whitespace-nowrap">Players</TableHead>
-                <TableHead className="py-1 whitespace-nowrap">Status</TableHead>
-                <TableHead className="py-1 text-right whitespace-nowrap">Action</TableHead>
+                <TableHead className="py-1 whitespace-nowrap bg-white">Lobby Name</TableHead>
+                <TableHead className="py-1 whitespace-nowrap bg-white">Host</TableHead>
+                <TableHead className="py-1 whitespace-nowrap bg-white">Players</TableHead>
+                <TableHead className="py-1 whitespace-nowrap bg-white">Status</TableHead>
+                <TableHead className="py-1 text-right whitespace-nowrap bg-white">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -14,6 +14,7 @@ import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
 import LobbyListTable from '@/components/lobby/LobbyListTable';
 import CreateLobbyForm from '@/components/lobby/CreateLobbyForm';
+import PowerGraph from '@/components/PowerGraph';
 
 const StartPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -121,11 +122,11 @@ const StartPage: React.FC = () => {
           <ChatBox chatId="global" className="border border-gray-200" title="Global Chat" />
         </div>
 
-        <main className="flex-1 overflow-y-auto p-2 sm:p-3">
-          <div className="container mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
+        <main className="flex-1 overflow-hidden p-2 sm:p-3 flex flex-col">
+          <div className="container mx-auto flex-1 flex flex-col min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3 flex-1 min-h-0">
               {/* Center: Lobby List */}
-              <div className="lg:col-span-2 space-y-2 sm:space-y-3">
+              <div className="lg:col-span-2 flex flex-col min-h-0">
                 {loadingLobbies ? (
                   <div className="p-8 text-center text-muted-foreground">Loading lobbies...</div>
                 ) : (
@@ -143,6 +144,26 @@ const StartPage: React.FC = () => {
                     getHostColor={getHostColor}
                   />
                 )}
+
+                {/* Game info - directly below lobby list */}
+                <div
+                  className="flex items-center gap-2 sm:gap-4 rounded-lg p-2 sm:p-4 mt-2 sm:mt-3 shrink-0"
+                  style={{ backgroundColor: '#F3F4F6' }}
+                >
+                  <PowerGraph className="shrink-0 scale-[0.6] sm:scale-100 -m-6 sm:m-0" />
+                  <div className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                    <p className="font-semibold text-gray-700 mb-1">The Game of Fish</p>
+                    <p>
+                      A strategic team card game of deduction and memory for 6 players.
+                      Ask opponents for cards, deduce holdings from questions asked, and
+                      declare complete half-suits to score. The best strategy divulges
+                      information to teammates while hiding it from opponents.
+                    </p>
+                    <p className="mt-2 text-xs italic text-gray-500 hidden sm:block">
+                      "A perfect history of the game is more valuable than perfect logic based on incomplete information."
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Right Center: Create Game */}
@@ -154,7 +175,7 @@ const StartPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Mobile Chat - shown at bottom on mobile, inside main content area for consistent spacing */}
+            {/* Mobile Chat - shown at bottom on mobile */}
             <div className="lg:hidden mt-2 sm:mt-3 pb-14">
               <ChatBox chatId="global" className="border border-gray-200 rounded-lg h-48" title="Global Chat" />
             </div>

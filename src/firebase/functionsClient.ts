@@ -50,7 +50,16 @@ export const callUpdateUserCurrentLobby = createCallable<
 
 // Lobby functions
 export const callCreateLobby = createCallable<
-  { name: string; maxPlayers: number; isPrivate?: boolean; challengeMode?: boolean },
+  {
+    name: string;
+    maxPlayers: number;
+    isPrivate?: boolean;
+    challengeMode?: boolean;
+    bluffQuestions?: boolean;
+    declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+    harshDeclarations?: boolean;
+    highSuitsDouble?: boolean;
+  },
   { success: boolean; lobbyId: string }
 >('createLobby');
 
@@ -90,7 +99,14 @@ export const callRandomizeTeams = createCallable<
 >('randomizeTeams');
 
 export const callUpdateLobbySettings = createCallable<
-  { lobbyId: string; challengeMode?: boolean },
+  {
+    lobbyId: string;
+    challengeMode?: boolean;
+    bluffQuestions?: boolean;
+    declarationMode?: 'own-turn' | 'team-turn' | 'anytime';
+    harshDeclarations?: boolean;
+    highSuitsDouble?: boolean;
+  },
   { success: boolean }
 >('updateLobbySettings');
 
