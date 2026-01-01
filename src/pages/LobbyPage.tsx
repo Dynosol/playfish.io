@@ -333,7 +333,15 @@ const LobbyPage: React.FC = () => {
                             const isPlayerHost = playerId === lobby.createdBy;
 
                             return (
-                              <div key={playerId} className="flex items-center gap-1">
+                              <div
+                                key={playerId}
+                                className="flex items-center gap-1 px-3 py-1 rounded-full"
+                                style={{
+                                  border: `1px solid ${colors.grayMedium}`,
+                                  backgroundColor: 'transparent',
+                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                                }}
+                              >
                                 <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
                                   {isCurrentUser ? 'You' : getUsername(playerId)}
                                 </span>
