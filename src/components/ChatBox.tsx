@@ -178,7 +178,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
   return (
     <>
       <style>{scrollbarStyles}</style>
-      <Card className={cn("w-full lg:w-72 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)} style={{ height: 'calc(100vh - 8rem)' }}>
+      <Card className={cn("w-full lg:w-72 flex flex-col bg-transparent border border-gray-300 rounded-lg", className)} style={{ height: 'calc(100vh - 12rem)' }}>
         <CardHeader className="p-3 flex flex-row items-center space-y-0 shrink-0 border-b border-gray-200 shadow">
         <CardTitle className="text-sm font-semibold">
           {title ?? (isGlobalChat ? 'Global Chat' : 'Chat')}

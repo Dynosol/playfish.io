@@ -40,7 +40,7 @@ const CreateLobbyForm: React.FC<CreateLobbyFormProps> = ({
 }) => {
   const [lobbyName, setLobbyName] = useState('');
   const [lobbyNameError, setLobbyNameError] = useState('');
-  const [maxPlayers, setMaxPlayers] = useState<string>("4");
+  const [maxPlayers, setMaxPlayers] = useState<string>("6");
   const [isPrivate, setIsPrivate] = useState(false);
   const [creating, setCreating] = useState(false);
 
