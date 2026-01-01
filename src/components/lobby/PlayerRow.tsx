@@ -30,7 +30,7 @@ const PlayerRow: React.FC<PlayerRowProps> = ({
       <td className="py-2 pr-2 text-base text-black font-bold w-6">{index + 1}</td>
       <td className="py-2" colSpan={2}>
         <div className="inline-flex items-center bg-white px-3 py-2 rounded shadow-sm">
-          <span className="text-base font-semibold" style={{ color: getUserColor(playerId) }}>
+          <span className={`text-base font-semibold ${isCurrentUser ? 'italic' : ''}`} style={{ color: getUserColor(playerId) }}>
             {isCurrentUser ? 'You' : getUsername(playerId)}
           </span>
           {isPlayerHost && (

@@ -382,7 +382,7 @@ const LobbyPage: React.FC = () => {
                                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
                                 }}
                               >
-                                <span className="text-sm font-semibold" style={{ color: getUserColor(playerId) }}>
+                                <span className={`text-sm font-semibold ${isCurrentUser ? 'italic' : ''}`} style={{ color: getUserColor(playerId) }}>
                                   {isCurrentUser ? 'You' : getUsername(playerId)}
                                 </span>
                                 {isPlayerHost && <Crown className="h-3 w-3 text-yellow-400" />}

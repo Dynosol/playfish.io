@@ -127,7 +127,8 @@ exports.updateUserCurrentLobby = (0, https_1.onCall)({ cors: corsOrigins, invoke
     }
     const uid = request.auth.uid;
     const { lobbyId } = request.data;
-    // This is an internal function, no explicit rate limit but we can add if needed
+    // Check rate limit
+    await (0, rateLimiter_1.checkRateLimit)(uid, 'user:updateUserCurrentLobby');
     const userRef = db.collection('users').doc(uid);
     await userRef.set({
         currentLobbyId: lobbyId,

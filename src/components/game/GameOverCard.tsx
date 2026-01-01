@@ -47,7 +47,7 @@ const GameOverCard: React.FC<GameOverCardProps> = ({
           {getTeamPlayers(game, winningTeam).map(playerId => (
             <li key={playerId}>
               {playerId === userId ? (
-                <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
+                <span className="font-semibold italic" style={{ color: getUserColor(playerId) }}>You</span>
               ) : (
                 <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
               )}
@@ -97,7 +97,7 @@ const GameOverCard: React.FC<GameOverCardProps> = ({
                 {getTeamPlayers(game, winningTeam).map(playerId => (
                   <li key={playerId}>
                     {playerId === userId ? (
-                      <span className="font-semibold" style={{ color: getUserColor(playerId) }}>You</span>
+                      <span className="font-semibold italic" style={{ color: getUserColor(playerId) }}>You</span>
                     ) : (
                       <span className="font-semibold" style={{ color: getUserColor(playerId) }}>{getUsername(playerId)}</span>
                     )}

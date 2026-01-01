@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import pencilIcon from '@/assets/pencil.png';
 import questionIcon from '@/assets/questionmark.png';
 import gearIcon from '@/assets/gear.png';
@@ -30,25 +30,43 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
   const { user } = useAuth();
   const { userDoc } = useUserDocument();
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingInSettings, setIsEditingInSettings] = useState(false);
   const [newUsername, setNewUsername] = useState('');
+  const [optimisticUsername, setOptimisticUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Display username: optimistic value takes priority, then userDoc
+  const displayUsername = optimisticUsername || userDoc?.username || 'StarUnicorn';
 
   // Sync local state with userDoc from context
   useEffect(() => {
     if (userDoc?.username) {
       setNewUsername(userDoc.username);
+      // Clear optimistic value once Firebase confirms the update
+      if (optimisticUsername && userDoc.username === optimisticUsername) {
+        setOptimisticUsername(null);
+      }
     }
-  }, [userDoc?.username]);
+  }, [userDoc?.username, optimisticUsername]);
 
   const handleSaveUsername = async () => {
       if (!user || !newUsername.trim()) return;
+      const trimmedName = newUsername.trim();
+
+      // Exit editing mode immediately
+      setIsEditing(false);
+      setIsEditingInSettings(false);
+      setOptimisticUsername(trimmedName);
+
+      // Then save to Firebase in background
       setLoading(true);
       try {
-          await updateUsername(user.uid, newUsername);
-          setIsEditing(false);
+          await updateUsername(user.uid, trimmedName);
       } catch (error) {
           console.error("Failed to update username", error);
+          // Revert optimistic update on error
+          setOptimisticUsername(null);
       } finally {
           setLoading(false);
       }
@@ -87,45 +105,52 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               <div className="hidden sm:flex items-center gap-2 font-medium text-lg">
                 <span>Welcome,{' '}</span>
                 {isEditing ? (
-                  <TooltipProvider>
-                    <Tooltip open={newUsername.trim().length > MAX_USERNAME_LENGTH}>
-                      <TooltipTrigger asChild>
-                        <input
-                          value={newUsername}
-                          onChange={(e) => setNewUsername(e.target.value)}
-                          className={cn(
-                            "border-b bg-transparent outline-none text-lg font-medium w-32",
-                            newUsername.trim().length > MAX_USERNAME_LENGTH ? "border-red-500" : "border-gray-400"
-                          )}
-                          style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
-                          maxLength={MAX_USERNAME_LENGTH + 5}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newUsername.trim().length <= MAX_USERNAME_LENGTH) handleSaveUsername();
-                            if (e.key === 'Escape') {
-                              setNewUsername(userDoc?.username || '');
-                              setIsEditing(false);
-                            }
-                          }}
-                          onBlur={() => {
-                            setNewUsername(userDoc?.username || '');
-                            setIsEditing(false);
-                          }}
-                          disabled={loading}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="bg-red-500 text-white">
-                        <p>Choose a shorter name!</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <>
+                    <TooltipProvider>
+                      <Tooltip open={newUsername.trim().length > MAX_USERNAME_LENGTH}>
+                        <TooltipTrigger asChild>
+                          <input
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            className={cn(
+                              "border-b bg-transparent outline-none text-lg font-medium w-32",
+                              newUsername.trim().length > MAX_USERNAME_LENGTH ? "border-red-500" : "border-gray-400"
+                            )}
+                            style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
+                            maxLength={MAX_USERNAME_LENGTH + 5}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newUsername.trim().length <= MAX_USERNAME_LENGTH) handleSaveUsername();
+                              if (e.key === 'Escape') {
+                                setNewUsername(userDoc?.username || '');
+                                setIsEditing(false);
+                              }
+                            }}
+                            disabled={loading}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-red-500 text-white">
+                          <p>Choose a shorter name!</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={handleSaveUsername}
+                      disabled={loading || newUsername.trim().length === 0 || newUsername.trim().length > MAX_USERNAME_LENGTH}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <span
                       className="underline decoration-1 underline-offset-2"
                       style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
                     >
-                      {userDoc?.username || 'StarUnicorn'}
+                      {displayUsername}
                     </span>
                     <Button
                       size="icon"
@@ -185,6 +210,72 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               </Button>
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-3">
+              {/* Change Name - matches header style */}
+              <div className="flex items-center gap-2 font-medium text-base">
+                <span className="text-gray-600">Name:</span>
+                {isEditingInSettings ? (
+                  <>
+                    <TooltipProvider>
+                      <Tooltip open={newUsername.trim().length > MAX_USERNAME_LENGTH}>
+                        <TooltipTrigger asChild>
+                          <input
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            className={cn(
+                              "border-b bg-transparent outline-none text-base font-medium flex-1",
+                              newUsername.trim().length > MAX_USERNAME_LENGTH ? "border-red-500" : "border-gray-400"
+                            )}
+                            style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
+                            maxLength={MAX_USERNAME_LENGTH + 5}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newUsername.trim().length <= MAX_USERNAME_LENGTH) handleSaveUsername();
+                              if (e.key === 'Escape') {
+                                setNewUsername(userDoc?.username || '');
+                                setIsEditingInSettings(false);
+                              }
+                            }}
+                            disabled={loading}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-red-500 text-white">
+                          <p>Choose a shorter name!</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={handleSaveUsername}
+                      disabled={loading || newUsername.trim().length === 0 || newUsername.trim().length > MAX_USERNAME_LENGTH}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className="underline decoration-1 underline-offset-2"
+                      style={{ color: getUserColorHex(userDoc?.color || 'slate') }}
+                    >
+                      {displayUsername}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setNewUsername(userDoc?.username || '');
+                        setIsEditingInSettings(true);
+                      }}
+                    >
+                      <img src={pencilIcon} alt="Edit" className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+
               <Link
                 to="/feedback"
                 onClick={() => setShowSettings(false)}
@@ -193,7 +284,6 @@ const Header: React.FC<HeaderProps> = ({ type, roomName, className }) => {
               >
                 Submit Feedback
               </Link>
-              <p className="text-sm text-gray-500 italic text-center">More settings coming soon!</p>
             </CardContent>
           </Card>
         </div>

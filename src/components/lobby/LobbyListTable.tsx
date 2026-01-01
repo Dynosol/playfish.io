@@ -90,9 +90,15 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                     <TableRow className={`h-8 ${isInThisLobby ? 'bg-gray-100' : ''}`}>
                     <TableCell className="py-1 font-medium whitespace-nowrap">{lobby.name}</TableCell>
                     <TableCell className="py-1 whitespace-nowrap">
-                      <span className="font-semibold" style={{ color: getHostColor(lobby.createdBy) }}>
-                        {getHostUsername(lobby.createdBy)}
-                      </span>
+                      {user?.uid === lobby.createdBy ? (
+                        <span className="font-semibold italic" style={{ color: getHostColor(lobby.createdBy) }}>
+                          You
+                        </span>
+                      ) : (
+                        <span className="font-semibold" style={{ color: getHostColor(lobby.createdBy) }}>
+                          {getHostUsername(lobby.createdBy)}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="py-1 whitespace-nowrap">
                       {lobby.players?.length || 0}/{lobby.maxPlayers || 4}

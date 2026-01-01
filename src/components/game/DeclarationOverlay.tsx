@@ -180,7 +180,8 @@ const DeclarationOverlay: React.FC<DeclarationOverlayProps> = ({
                                 "flex-1 px-2 py-1 text-xs font-medium rounded border transition-all",
                                 isSelected
                                   ? "border-transparent text-white"
-                                  : "border-gray-300 bg-white hover:bg-gray-50"
+                                  : "border-gray-300 bg-white hover:bg-gray-50",
+                                playerId === user?.uid && "italic"
                               )}
                               style={isSelected ? { backgroundColor: getUserColor(playerId) } : { color: getUserColor(playerId) }}
                             >

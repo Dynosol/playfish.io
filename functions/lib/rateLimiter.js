@@ -42,8 +42,15 @@ const RATE_LIMITS = {
     'chat:sendMessage': { maxRequests: 50, windowMs: 60000 },
     // Game actions
     'game:askForCard': { maxRequests: 30, windowMs: 60000 },
+    'game:passTurnToTeammate': { maxRequests: 20, windowMs: 60000 },
     'game:startDeclaration': { maxRequests: 10, windowMs: 60000 },
+    'game:abortDeclaration': { maxRequests: 10, windowMs: 60000 },
+    'game:selectDeclarationHalfSuit': { maxRequests: 20, windowMs: 60000 },
+    'game:selectDeclarationTeam': { maxRequests: 20, windowMs: 60000 },
     'game:finishDeclaration': { maxRequests: 10, windowMs: 60000 },
+    'game:startChallenge': { maxRequests: 10, windowMs: 60000 },
+    'game:abortChallenge': { maxRequests: 10, windowMs: 60000 },
+    'game:respondToChallenge': { maxRequests: 20, windowMs: 60000 },
     'game:voteForReplay': { maxRequests: 5, windowMs: 60000 },
     'game:leaveGame': { maxRequests: 5, windowMs: 60000 },
     'game:returnToGame': { maxRequests: 5, windowMs: 60000 },
@@ -63,6 +70,7 @@ const RATE_LIMITS = {
     'user:updateUsername': { maxRequests: 5, windowMs: 60000 },
     'user:createOrUpdateUser': { maxRequests: 10, windowMs: 60000 },
     'user:updateUserLastOnline': { maxRequests: 60, windowMs: 60000 },
+    'user:updateUserCurrentLobby': { maxRequests: 20, windowMs: 60000 },
     // Feedback
     'feedback:submitFeedback': { maxRequests: 1, windowMs: 60000 },
 };
