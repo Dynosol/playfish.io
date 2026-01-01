@@ -564,24 +564,20 @@ exports.returnToLobby = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'publi
     return { success: true };
 });
 // Scheduled function to check for stale lobbies
-// Runs every 5 minutes to mark lobbies as stale if inactive for 30 minutes
+// Runs every 15 minutes to mark lobbies as stale if inactive for 30 minutes
 const LOBBY_STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-exports.checkInactiveLobbies = (0, scheduler_1.onSchedule)('every 5 minutes', async () => {
+exports.checkInactiveLobbies = (0, scheduler_1.onSchedule)('every 15 minutes', async () => {
     const now = Date.now();
     const staleThreshold = now - LOBBY_STALE_THRESHOLD_MS;
-    // Find waiting lobbies that haven't been marked stale yet
+    // Find waiting lobbies that are inactive for 30+ minutes (filter at DB level)
     const lobbiesSnapshot = await db.collection('lobbies')
         .where('status', '==', 'waiting')
         .where('stale', '!=', true)
+        .where('lastActivityAt', '<', staleThreshold)
         .get();
     for (const lobbyDoc of lobbiesSnapshot.docs) {
-        const lobby = lobbyDoc.data();
-        const lastActivity = lobby.lastActivityAt ||
-            lobby.createdAt?._seconds * 1000;
-        if (lastActivity && lastActivity <= staleThreshold) {
-            await lobbyDoc.ref.update({ stale: true });
-            console.log(`Lobby ${lobbyDoc.id} marked as stale`);
-        }
+        await lobbyDoc.ref.update({ stale: true });
+        console.log(`Lobby ${lobbyDoc.id} marked as stale`);
     }
 });
 //# sourceMappingURL=lobby.js.map

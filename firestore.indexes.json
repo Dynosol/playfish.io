@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "lobbies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "stale", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

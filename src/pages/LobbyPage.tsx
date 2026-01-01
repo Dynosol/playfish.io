@@ -379,7 +379,7 @@ const LobbyPage: React.FC = () => {
                   {/* Status Info */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{lobby.players.length}/{lobby.maxPlayers} players</span>
-                    {(lobby.stale || lobby.status === 'playing' || lobby.players.length < 2 || !teamsEven) && (
+                    {(lobby.stale || lobby.status === 'playing' || (lobby.status === 'waiting' && (lobby.players.length < lobby.maxPlayers || !teamsEven))) && (
                       <div
                         className="px-3 py-1 text-xs font-normal rounded-full text-white"
                         style={{
@@ -393,9 +393,11 @@ const LobbyPage: React.FC = () => {
                         {lobby.stale && lobby.status === 'waiting'
                           ? 'Stale'
                           : lobby.status === 'waiting'
-                            ? (lobby.players.length >= 2 && !teamsEven
-                                ? 'Teams must be balanced to start'
-                                : 'Waiting for more players')
+                            ? (lobby.players.length < lobby.maxPlayers
+                                ? 'Waiting for players'
+                                : !teamsEven
+                                  ? 'Teams must be balanced to start'
+                                  : 'Ready to start')
                             : 'In Progress'}
                       </div>
                     )}

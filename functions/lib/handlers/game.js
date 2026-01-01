@@ -955,14 +955,17 @@ exports.forfeitGame = (0, https_1.onCall)({ cors: corsOrigins, invoker: 'public'
     return { success: true };
 });
 // Scheduled function to check for inactive games and auto-forfeit them
-// Runs every minute to check for games that have been inactive for 1 hour
-exports.checkInactiveGames = (0, scheduler_1.onSchedule)('every 1 minutes', async () => {
+// Runs every 5 minutes - only queries games idle for 30+ seconds to reduce reads
+exports.checkInactiveGames = (0, scheduler_1.onSchedule)('every 5 minutes', async () => {
     const now = Date.now();
     const inactivityThreshold = now - INACTIVITY_TIMEOUT_MS;
     const leaveTimeoutThreshold = now - (LEAVE_TIMEOUT_SECONDS * 1000);
-    // Find active games (no gameOver) that have been inactive
+    // Only check games that have been idle for at least 30 seconds
+    const idleThreshold = now - 30000;
+    // Find active games that have been idle for 30+ seconds (reduces reads significantly)
     const gamesSnapshot = await db.collection('games')
         .where('gameOver', '==', null)
+        .where('lastActivityAt', '<', idleThreshold)
         .get();
     for (const gameDoc of gamesSnapshot.docs) {
         const game = { id: gameDoc.id, ...gameDoc.data() };
