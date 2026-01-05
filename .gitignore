@@ -33,3 +33,6 @@ dist-ssr
 /*.png
 /*.svg
 /*.jpg
+
+# RL Training (not ready for production)
+training/
