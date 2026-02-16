@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '@/components/Header';
 import SEO from '@/components/SEO';
@@ -59,8 +58,6 @@ import ChallengeHalfSuitDialog from '../components/game/ChallengeHalfSuitDialog'
 import ChallengeResponsePopup from '../components/game/ChallengeResponsePopup';
 import SelectTeammateDialog from '../components/game/SelectTeammateDialog';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
-import { Button } from "@/components/ui/button";
-import { Card as UICard, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Linear interpolation helper for continuous sizing
 const lerp = (min: number, max: number, t: number) => min + (max - min) * t;
