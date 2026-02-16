@@ -201,6 +201,27 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
                 </div>
               ) : (
                 timeline.map((item, index) => {
+                  const itemTime = getTime(item.data.timestamp);
+                  const itemDate = new Date(itemTime);
+                  const prevItem = index > 0 ? timeline[index - 1] : null;
+                  const prevTime = prevItem ? getTime(prevItem.data.timestamp) : 0;
+                  const prevDate = prevTime ? new Date(prevTime) : null;
+                  const showDateSeparator = !prevDate ||
+                    itemDate.toDateString() !== prevDate.toDateString();
+
+                  const dateSeparator = showDateSeparator && itemTime > 0 ? (
+                    <div key={`date-${itemDate.toDateString()}`} className="text-center text-xs text-gray-400 py-2">
+                      {(() => {
+                        const now = new Date();
+                        const yesterday = new Date(now);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        if (itemDate.toDateString() === now.toDateString()) return 'Today';
+                        if (itemDate.toDateString() === yesterday.toDateString()) return 'Yesterday';
+                        return itemDate.toLocaleDateString(navigator.language || 'en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                      })()}
+                    </div>
+                  ) : null;
+
                   if (item.type === 'turn' && getUsernameProp) {
                     const turn = item.data;
                     const isRedSuit = turn.card.suit === 'hearts' || turn.card.suit === 'diamonds';
@@ -210,32 +231,35 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
                     const nextPlayerName = getUsernameProp(item.nextTurnPlayer);
 
                     return (
-                      <div key={`turn-${getTime(turn.timestamp)}-${index}`} className="text-center py-2 space-y-0.5">
-                        <div className="text-xs text-gray-600">
-                          <span className="font-semibold">{askerName}</span>
-                          {' asked '}
-                          <span className="font-semibold">{targetName}</span>
-                          {' for the '}
-                          <span className="font-semibold">{turn.card.rank}</span>
-                          {' of '}
-                          <span style={{ color: suitColor }}>{suitIcons[turn.card.suit]}</span>
-                          {', and was '}
-                          <span
-                            className="font-bold"
-                            style={{ color: turn.success ? colors.purple : colors.red }}
-                          >
-                            {turn.success ? 'RIGHT' : 'WRONG'}
-                          </span>
-                          {'.'}
+                      <React.Fragment key={`turn-${getTime(turn.timestamp)}-${index}`}>
+                        {dateSeparator}
+                        <div className="text-center py-2 space-y-0.5">
+                          <div className="text-xs text-gray-600">
+                            <span className="font-semibold">{askerName}</span>
+                            {' asked '}
+                            <span className="font-semibold">{targetName}</span>
+                            {' for the '}
+                            <span className="font-semibold">{turn.card.rank}</span>
+                            {' of '}
+                            <span style={{ color: suitColor }}>{suitIcons[turn.card.suit]}</span>
+                            {', and was '}
+                            <span
+                              className="font-bold"
+                              style={{ color: turn.success ? colors.purple : colors.red }}
+                            >
+                              {turn.success ? 'RIGHT' : 'WRONG'}
+                            </span>
+                            {'.'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {"It is now "}
+                            <span className="font-semibold">{nextPlayerName}</span>
+                            {"'s turn"}
+                            {turn.success && ' (again)'}
+                            {'.'}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {"It is now "}
-                          <span className="font-semibold">{nextPlayerName}</span>
-                          {"'s turn"}
-                          {turn.success && ' (again)'}
-                          {'.'}
-                        </div>
-                      </div>
+                      </React.Fragment>
                     );
                   }
 
@@ -250,61 +274,70 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
                     const teamLabel = declaration.team === 0 ? 'Team 1' : 'Team 2';
 
                     return (
-                      <div key={`declaration-${getTime(declaration.timestamp)}-${index}`} className="text-center py-2 space-y-0.5">
-                        <div className="text-xs text-gray-600">
-                          <span className="font-semibold">{declareeName}</span>
-                          {' declared '}
-                          <span style={{ color: suitColor }}>{suitIcons[suit]}</span>
-                          {' '}
-                          <span className="font-semibold">{rangeLabel}</span>
-                          {' for '}
-                          <span className="font-semibold">{teamLabel}</span>
-                          {', and was '}
-                          <span
-                            className="font-bold"
-                            style={{ color: declaration.correct ? colors.green : colors.red }}
-                          >
-                            {declaration.correct ? 'CORRECT' : 'WRONG'}
-                          </span>
-                          {'!'}
+                      <React.Fragment key={`declaration-${getTime(declaration.timestamp)}-${index}`}>
+                        {dateSeparator}
+                        <div className="text-center py-2 space-y-0.5">
+                          <div className="text-xs text-gray-600">
+                            <span className="font-semibold">{declareeName}</span>
+                            {' declared '}
+                            <span style={{ color: suitColor }}>{suitIcons[suit]}</span>
+                            {' '}
+                            <span className="font-semibold">{rangeLabel}</span>
+                            {' for '}
+                            <span className="font-semibold">{teamLabel}</span>
+                            {', and was '}
+                            <span
+                              className="font-bold"
+                              style={{ color: declaration.correct ? colors.green : colors.red }}
+                            >
+                              {declaration.correct ? 'CORRECT' : 'WRONG'}
+                            </span>
+                            {'!'}
+                          </div>
                         </div>
-                      </div>
+                      </React.Fragment>
                     );
                   }
 
                   // Regular chat message
                   const msg = item.data as ChatMessage;
                   const isCurrentUser = msg.userId === user?.uid;
-                  const prevItem = index > 0 ? timeline[index - 1] : null;
                   const showName = !prevItem || prevItem.type !== 'message' || (prevItem.data as ChatMessage).userId !== msg.userId;
                   return (
-                    <div
-                      key={msg.id}
-                      className={cn(
-                        "flex flex-col max-w-[85%] text-sm",
-                        isCurrentUser ? "ml-auto items-end" : "mr-auto items-start",
-                        !showName && "-mt-1"
-                      )}
-                    >
-                      {showName && (
-                        <span
-                          className={`text-xs mb-0.5 font-semibold ${isCurrentUser ? 'italic' : ''}`}
-                          style={{ color: getUserColorHex(usersData.get(msg.userId)?.color || 'slate') }}
-                        >
-                          {isCurrentUser ? 'You' : msg.userName}
-                        </span>
-                      )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="py-0.5 cursor-default">
-                            {msg.message}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side={isCurrentUser ? "left" : "right"}>
-                          {formatTimestamp(msg.timestamp)}
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                    <React.Fragment key={msg.id}>
+                      {dateSeparator}
+                      <div
+                        className={cn(
+                          "flex flex-col max-w-[85%] text-sm",
+                          isCurrentUser ? "ml-auto items-end" : "mr-auto items-start",
+                          !showName && !dateSeparator && "-mt-1"
+                        )}
+                      >
+                        {showName && (
+                          <span className="text-xs mb-0.5 flex items-center gap-1.5">
+                            <span
+                              className={`font-semibold ${isCurrentUser ? 'italic' : ''}`}
+                              style={{ color: getUserColorHex(usersData.get(msg.userId)?.color || 'slate') }}
+                            >
+                              {isCurrentUser ? 'You' : msg.userName}
+                            </span>
+                            <span className="text-gray-400 font-normal">
+                              {new Date(msg.timestamp).toLocaleTimeString(navigator.language || 'en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                            </span>
+                          </span>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="py-0.5 cursor-default">
+                              {msg.message}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side={isCurrentUser ? "left" : "right"}>
+                            {formatTimestamp(msg.timestamp)}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </React.Fragment>
                   );
                 })
               )}

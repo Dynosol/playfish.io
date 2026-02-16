@@ -279,39 +279,13 @@ const GamePage: React.FC = () => {
   }
 
   if (!lobby) {
-    return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <UICard className="rounded shadow">
-          <CardHeader>
-            <CardTitle>Lobby not found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/')} variant="outline" className="rounded">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Button>
-          </CardContent>
-        </UICard>
-      </div>
-    );
+    navigate('/');
+    return null;
   }
 
   if (!lobby.onGoingGame || !game) {
-    return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <UICard className="rounded shadow">
-          <CardHeader>
-            <CardTitle>Game not started</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate(`/lobby/${gameId}`)} variant="outline" className="rounded">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Lobby
-            </Button>
-          </CardContent>
-        </UICard>
-      </div>
-    );
+    navigate(`/lobby/${gameId}`);
+    return null;
   }
 
   const playerHand = localPlayerHand;

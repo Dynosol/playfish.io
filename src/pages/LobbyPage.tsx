@@ -47,6 +47,13 @@ const LobbyPage: React.FC = () => {
   // If user is viewing a different lobby than their current one, userCurrentLobby comes from context
   // (only show warnings if userCurrentLobby.id !== gameId)
 
+  // Auto-redirect to home when lobby is deleted/gone
+  useEffect(() => {
+    if (!loading && !lobby && !isLeavingRef.current && hasJoined) {
+      navigate('/');
+    }
+  }, [loading, lobby, hasJoined, navigate]);
+
   // Auto-redirect to game when lobby status changes to 'playing'
   useEffect(() => {
     if (!lobby || !gameId || !user) return;
