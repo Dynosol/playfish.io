@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 const firebaseConfig = {
@@ -15,11 +15,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+const useEmulator = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true';
+
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: useEmulator,
+});
 export const functions = getFunctions(app);
 
 // Connect to emulators in development
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true') {
+if (useEmulator) {
   connectFirestoreEmulator(db, 'localhost', 8080);
   connectFunctionsEmulator(functions, 'localhost', 5001);
 }
