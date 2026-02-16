@@ -1,5 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
@@ -14,8 +13,7 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-const app = initializeApp(firebaseConfig);
-isSupported().then((supported) => { if (supported) getAnalytics(app); });
+export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 const useEmulator = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATOR === 'true';

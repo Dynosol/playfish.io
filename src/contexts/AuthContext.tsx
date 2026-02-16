@@ -3,6 +3,7 @@ import { auth } from '../firebase/config';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { createOrUpdateUser, updateUserLogoffTime } from '../firebase/userService';
+import { identifyUser } from '../firebase/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         previousUserIdRef.current = currentUser.uid;
+        identifyUser(currentUser.uid);
         try {
           // Wait for user document creation before considering user logged in
           await createOrUpdateUser(currentUser.uid);

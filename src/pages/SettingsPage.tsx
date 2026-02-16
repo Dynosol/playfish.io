@@ -5,6 +5,7 @@ import { useUserDocument } from '../contexts/UserDocumentContext';
 import { updateUsername } from '../firebase/userService';
 import { colors } from '../utils/colors';
 import { containsProfanity } from '../utils/profanityFilter';
+import { logPageView, logUsernameChanged } from '../firebase/analytics';
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -13,6 +14,8 @@ const SettingsPage: React.FC = () => {
   const [newUsername, setNewUsername] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { logPageView('Settings'); }, []);
 
   // Sync local state with userDoc from context
   useEffect(() => {
@@ -53,6 +56,7 @@ const SettingsPage: React.FC = () => {
 
     try {
       await updateUsername(user.uid, newUsername.trim());
+      logUsernameChanged();
       setEditingUsername(false);
     } catch (err) {
       setError((err as Error).message);

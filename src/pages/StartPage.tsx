@@ -8,6 +8,7 @@ import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
 import { subscribeToActiveLobbies, createLobby, joinLobby } from '../firebase/lobbyService';
 import { returnToGame } from '../firebase/gameService';
+import { logPageView, logLobbyCreated, logLobbyJoined, logSpectateGame, logGameReturned } from '../firebase/analytics';
 import type { Lobby } from '../firebase/lobbyService';
 
 import Header from '@/components/Header';
@@ -25,6 +26,8 @@ const StartPage: React.FC = () => {
   const [joining, setJoining] = useState<string | null>(null);
   const [isReturning, setIsReturning] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => { logPageView('Home'); }, []);
 
   const hostUids = useMemo(() => lobbies.map(l => l.createdBy).filter(Boolean), [lobbies]);
   const hostUsersData = useUsers(hostUids);
@@ -61,6 +64,7 @@ const StartPage: React.FC = () => {
       maxPlayers,
       isPrivate
     });
+    logLobbyCreated({ maxPlayers, isPrivate });
     navigate(`/lobby/${lobbyId}`);
   };
 
@@ -70,6 +74,7 @@ const StartPage: React.FC = () => {
     setJoining(lobbyId);
     try {
       await joinLobby(lobbyId, user.uid);
+      logLobbyJoined({ lobbyId, playerCount: lobbies.find(l => l.id === lobbyId)?.players.length ?? 0 });
       navigate(`/lobby/${lobbyId}`);
     } catch (error) {
       console.error('Failed to join lobby:', error);
@@ -78,6 +83,7 @@ const StartPage: React.FC = () => {
   };
 
   const handleSpectate = (lobbyId: string, status: string) => {
+    logSpectateGame(lobbyId);
     if (status === 'playing') {
       navigate(`/game/${lobbyId}`);
     } else {
@@ -93,6 +99,7 @@ const StartPage: React.FC = () => {
     try {
       const result = await returnToGame(currentGame.id, user.uid);
       if (result.success) {
+        logGameReturned();
         navigate(`/game/${lobbyId}`);
       } else {
         console.error('Failed to return to game:', result.error);

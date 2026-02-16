@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChatContext } from '../contexts/ChatContext';
 import { sendMessage, GLOBAL_CHAT_ID, type ChatMessage } from '../firebase/chatService';
+import { logChatMessageSent } from '../firebase/analytics';
 import { useUsername, useUsers } from '../hooks/useUsername';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -169,6 +170,8 @@ const ChatBox: React.FC<ChatBoxProps> = ({ chatId, className, title, gameTurns, 
     setInputMessage('');
 
     // Send in background
+    const chatType = isGlobalChat ? 'global' : (gameTurns ? 'game' : 'lobby');
+    logChatMessageSent({ chatType: chatType as 'global' | 'lobby' | 'game', messageLength: message.length });
     const userName = username || `User ${user.uid.slice(0, 16)}`;
     sendMessage(chatId, user.uid, userName, message).catch((error) => {
       console.error('Failed to send message:', error);

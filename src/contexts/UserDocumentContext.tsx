@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { subscribeToUser } from '../firebase/userService';
 import type { UserDocument } from '../firebase/userService';
+import { setUserProps } from '../firebase/analytics';
 
 interface UserDocumentContextType {
   userDoc: UserDocument | null;
@@ -34,6 +35,12 @@ export const UserDocumentProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setLoading(true);
     const unsubscribe = subscribeToUser(user.uid, (data) => {
       setUserDoc(data);
+      if (data) {
+        setUserProps({
+          color: data.color,
+          has_custom_username: !data.username.startsWith('User '),
+        });
+      }
       setLoading(false);
     });
 

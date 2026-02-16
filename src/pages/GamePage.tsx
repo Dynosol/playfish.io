@@ -30,6 +30,13 @@ import {
   type Card
 } from '../firebase/gameService';
 import { subscribeToLobby, returnToLobby, replayGame } from '../firebase/lobbyService';
+import {
+  logPageView, logCardAsked, logTurnPassed, logDeclarationStarted,
+  logDeclarationCompleted, logDeclarationAborted, logChallengeStarted,
+  logChallengeResponded, logGameOver, logReplayVoted, logGameLeft,
+  logGameForfeited, logReturnToLobby, logReplayStarted,
+  logHandShuffled, logHandSorted,
+} from '../firebase/analytics';
 import type { Game } from '../firebase/gameService';
 import type { Lobby } from '../firebase/lobbyService';
 import ChatBox from '../components/ChatBox';
@@ -85,6 +92,24 @@ const GamePage: React.FC = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [showChallengeDialog, setShowChallengeDialog] = useState(false);
   const [challengeTimeRemaining, setChallengeTimeRemaining] = useState(30);
+
+  useEffect(() => { logPageView('Game', gameId); }, [gameId]);
+
+  // Log game over event when game ends
+  const gameOverLoggedRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (game?.gameOver?.winner != null && game.id !== gameOverLoggedRef.current) {
+      gameOverLoggedRef.current = game.id;
+      logGameOver({
+        winnerTeam: game.gameOver.winner,
+        score0: game.scores[0] ?? 0,
+        score1: game.scores[1] ?? 0,
+        turnCount: game.turns?.length ?? 0,
+        declarationCount: game.declarations?.length ?? 0,
+        playerCount: game.players?.length ?? 0,
+      });
+    }
+  }, [game?.gameOver?.winner, game?.id]);
 
   // Track window width continuously for responsive card sizing
   useEffect(() => {
@@ -183,6 +208,7 @@ const GamePage: React.FC = () => {
       setLeaveCountdown(remaining);
 
       if (remaining === 0 && lobby?.onGoingGame) {
+        logGameForfeited();
         forfeitGame(lobby.onGoingGame);
       }
     };
@@ -303,6 +329,7 @@ const GamePage: React.FC = () => {
       }
       return shuffled;
     });
+    logHandShuffled();
     setToast({ message: 'Shuffled!', visible: true });
   };
 
@@ -310,6 +337,7 @@ const GamePage: React.FC = () => {
     setSortMethod(prev => {
       const nextMethod = getNextSortMethod(prev);
       setLocalPlayerHand(currentHand => sortCards(currentHand, nextMethod));
+      logHandSorted(nextMethod);
       setToast({ message: `Ordered by ${getSortMethodLabel(nextMethod)}!`, visible: true });
       return nextMethod;
     });
@@ -332,6 +360,7 @@ const GamePage: React.FC = () => {
     if (!result.success && result.error) {
       setErrorMessage(result.error);
     } else {
+      logCardAsked(card.halfSuit);
       setSelectedOpponent('');
       setErrorMessage('');
     }
@@ -347,6 +376,8 @@ const GamePage: React.FC = () => {
 
     if (!result.success && result.error) {
       setErrorMessage(result.error);
+    } else {
+      logTurnPassed();
     }
   };
 
@@ -380,6 +411,7 @@ const GamePage: React.FC = () => {
       setDeclareError(result.error);
       setIsDeclaring(false);
     } else {
+      logDeclarationStarted();
       setIsDeclaring(false);
     }
   };
@@ -394,6 +426,8 @@ const GamePage: React.FC = () => {
 
     if (!result.success && result.error) {
       setDeclareError(result.error);
+    } else {
+      logDeclarationAborted();
     }
 
     setIsDeclaring(false);
@@ -460,6 +494,7 @@ const GamePage: React.FC = () => {
     if (!result.success && result.error) {
       setDeclareError(result.error);
     } else {
+      logDeclarationCompleted({ halfSuit: declarationHalfSuit, team: declarationTeam });
       setDeclarationAssignments({});
     }
 
@@ -476,6 +511,8 @@ const GamePage: React.FC = () => {
 
     if (!result.success && result.error) {
       setDeclareError(result.error);
+    } else {
+      logChallengeStarted(halfSuit);
     }
   };
 
@@ -486,6 +523,8 @@ const GamePage: React.FC = () => {
 
     if (!result.success && result.error) {
       setDeclareError(result.error);
+    } else {
+      logChallengeResponded(response);
     }
   };
 
@@ -502,6 +541,7 @@ const GamePage: React.FC = () => {
     if (!gameId) return;
     try {
       await returnToLobby(gameId);
+      logReturnToLobby();
     } catch (error) {
       console.error('Failed to return to lobby:', error);
     }
@@ -511,6 +551,7 @@ const GamePage: React.FC = () => {
     if (!gameId || !isHost) return;
     try {
       await replayGame(gameId);
+      logReplayStarted();
     } catch (error) {
       console.error('Failed to replay game:', error);
     }
@@ -522,6 +563,8 @@ const GamePage: React.FC = () => {
       const result = await voteForReplay(game.id, user.uid);
       if (!result.success && result.error) {
         console.error('Failed to vote for replay:', result.error);
+      } else {
+        logReplayVoted();
       }
     } catch (error) {
       console.error('Failed to vote for replay:', error);
@@ -533,6 +576,7 @@ const GamePage: React.FC = () => {
     try {
       const result = await leaveGame(game.id, user.uid);
       if (result.success) {
+        logGameLeft();
         navigate('/');
       } else {
         console.error('Failed to leave game:', result.error);

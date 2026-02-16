@@ -10,6 +10,11 @@ import type { Lobby } from '../firebase/lobbyService';
 import { useUsers } from '../hooks/useUsername';
 import { getUserColorHex } from '../utils/userColors';
 import { colors } from '../utils/colors';
+import {
+  logPageView, logLobbyLeft, logLobbyDeleted, logGameStarted,
+  logTeamJoined, logTeamLeft, logTeamSwapped, logTeamsRandomized,
+  logInviteLinkCopied, logLobbySettingChanged,
+} from '../firebase/analytics';
 import Header from '@/components/Header';
 import ChatBox from '@/components/ChatBox';
 import TeamPanel from '@/components/lobby/TeamPanel';
@@ -28,6 +33,8 @@ const LobbyPage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isLeavingRef = useRef(false);
   const navigate = useNavigate();
+
+  useEffect(() => { logPageView('Lobby', gameId); }, [gameId]);
 
   // Subscribe to the lobby being viewed (from URL param)
   useEffect(() => {
@@ -98,6 +105,7 @@ const LobbyPage: React.FC = () => {
     try {
       isLeavingRef.current = true;
       await leaveLobby(gameId, user.uid);
+      logLobbyLeft(gameId);
       navigate('/');
     } catch (error) {
       console.error('Failed to leave lobby:', error);
@@ -110,6 +118,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await deleteLobby(gameId, user.uid);
+      logLobbyDeleted(gameId);
       navigate('/');
     } catch (error) {
       console.error('Failed to delete lobby:', error);
@@ -121,6 +130,15 @@ const LobbyPage: React.FC = () => {
 
     try {
       await startLobby(gameId);
+      logGameStarted({
+        lobbyId: gameId,
+        playerCount: lobby.players.length,
+        challengeMode: lobby.challengeMode || false,
+        bluffQuestions: lobby.bluffQuestions || false,
+        declarationMode: lobby.declarationMode || 'own-turn',
+        harshDeclarations: lobby.harshDeclarations !== false,
+        highSuitsDouble: lobby.highSuitsDouble || false,
+      });
     } catch (error) {
       console.error('Failed to start lobby:', error);
     }
@@ -131,6 +149,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await joinTeam(gameId, user.uid, team);
+      logTeamJoined({ lobbyId: gameId, team });
     } catch (error) {
       console.error('Failed to join team:', error);
     }
@@ -141,6 +160,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await leaveTeam(gameId);
+      logTeamLeft(gameId);
     } catch (error) {
       console.error('Failed to leave team:', error);
     }
@@ -151,6 +171,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await swapPlayerTeam(gameId, playerId);
+      logTeamSwapped(gameId);
     } catch (error) {
       console.error('Failed to swap team:', error);
     }
@@ -161,6 +182,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await randomizeTeams(gameId, user.uid);
+      logTeamsRandomized(gameId);
     } catch (error) {
       console.error('Failed to randomize teams:', error);
     }
@@ -171,6 +193,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await updateLobbySettings(gameId, { challengeMode: !lobby.challengeMode });
+      logLobbySettingChanged({ setting: 'challenge_mode', value: !lobby.challengeMode });
     } catch (error) {
       console.error('Failed to toggle challenge mode:', error);
     }
@@ -181,6 +204,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await updateLobbySettings(gameId, { bluffQuestions: !lobby.bluffQuestions });
+      logLobbySettingChanged({ setting: 'bluff_questions', value: !lobby.bluffQuestions });
     } catch (error) {
       console.error('Failed to toggle bluff questions:', error);
     }
@@ -191,6 +215,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await updateLobbySettings(gameId, { declarationMode: mode });
+      logLobbySettingChanged({ setting: 'declaration_mode', value: mode });
     } catch (error) {
       console.error('Failed to set declaration mode:', error);
     }
@@ -201,6 +226,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await updateLobbySettings(gameId, { harshDeclarations: !(lobby.harshDeclarations !== false) });
+      logLobbySettingChanged({ setting: 'harsh_declarations', value: !(lobby.harshDeclarations !== false) });
     } catch (error) {
       console.error('Failed to toggle harsh declarations:', error);
     }
@@ -211,6 +237,7 @@ const LobbyPage: React.FC = () => {
 
     try {
       await updateLobbySettings(gameId, { highSuitsDouble: !lobby.highSuitsDouble });
+      logLobbySettingChanged({ setting: 'high_suits_double', value: !lobby.highSuitsDouble });
     } catch (error) {
       console.error('Failed to toggle high suits double:', error);
     }
@@ -219,6 +246,7 @@ const LobbyPage: React.FC = () => {
   const handleCopyInviteLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
+      logInviteLinkCopied(gameId || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {

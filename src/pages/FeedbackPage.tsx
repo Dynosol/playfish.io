@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import Header from '@/components/Header';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { colors } from '@/utils/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { callSubmitFeedback } from '@/firebase/functionsClient';
+import { logPageView, logFeedbackSubmitted } from '@/firebase/analytics';
 
 const FeedbackPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ const FeedbackPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => { logPageView('Feedback'); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +43,7 @@ const FeedbackPage: React.FC = () => {
 
     try {
       await callSubmitFeedback({ message: trimmedMessage });
+      logFeedbackSubmitted(trimmedMessage.length);
       setSuccess(true);
       setMessage('');
     } catch (err) {

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Header from '@/components/Header';
 import SEO from '@/components/SEO';
 import { colors } from '@/utils/colors';
+import { logPageView } from '@/firebase/analytics';
 
 const rulesStructuredData = {
   "@context": "https://schema.org",
@@ -105,6 +106,7 @@ const faqStructuredData = {
 
 const RulesPage: React.FC = () => {
   const navigate = useNavigate();
+  useEffect(() => { logPageView('Rules'); }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
