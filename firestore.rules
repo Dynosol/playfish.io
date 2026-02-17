@@ -46,10 +46,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Games: players-only read, writes now handled by Cloud Functions
+    // Games: any authenticated user can read (allows spectating), writes handled by Cloud Functions
     match /games/{gameId} {
-      allow read: if request.auth != null &&
-                  request.auth.uid in resource.data.players;
+      allow read: if request.auth != null;
       // Writes are now handled by Cloud Functions
       allow create, update, delete: if false;
     }
