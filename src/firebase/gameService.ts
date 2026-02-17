@@ -145,6 +145,8 @@ export const subscribeToGame = (
     } else {
       callback(null);
     }
+  }, () => {
+    callback(null);
   });
 };
 

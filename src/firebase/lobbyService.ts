@@ -109,6 +109,8 @@ export const subscribeToLobby = (
     } else {
       callback(null);
     }
+  }, () => {
+    callback(null);
   });
 };
 
