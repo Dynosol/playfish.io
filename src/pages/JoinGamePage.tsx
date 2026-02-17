@@ -34,12 +34,8 @@ const JoinGamePage: React.FC = () => {
     }
   };
 
-  const handleSpectate = (lobbyId: string, status: string) => {
-    if (status === 'playing') {
-      navigate(`/game/${lobbyId}`);
-    } else {
-      navigate(`/lobby/${lobbyId}`);
-    }
+  const handleSpectate = (lobbyId: string) => {
+    navigate(`/game/${lobbyId}`);
   };
 
   return (
@@ -84,12 +80,14 @@ const JoinGamePage: React.FC = () => {
                       >
                         {joining === lobby.id ? 'Joining...' : 'Join'}
                       </button>
-                    ) : (
-                      <button 
-                        onClick={() => handleSpectate(lobby.id, lobby.status)}
+                    ) : lobby.status === 'playing' ? (
+                      <button
+                        onClick={() => handleSpectate(lobby.id)}
                       >
                         Spectate
                       </button>
+                    ) : (
+                      <span>Full</span>
                     )}
                   </td>
                 </tr>

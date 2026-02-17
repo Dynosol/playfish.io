@@ -30,7 +30,7 @@ interface LobbyListTableProps {
   joining: string | null;
   isReturning: boolean;
   onJoinGame: (lobbyId: string) => void;
-  onSpectate: (lobbyId: string, status: string) => void;
+  onSpectate: (lobbyId: string) => void;
   onReturnToGame: (lobbyId: string) => void;
   getHostUsername: (hostId: string) => string;
   getHostColor: (hostId: string) => string;
@@ -139,7 +139,7 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                           <Button
                             size="sm"
                             className="h-6 w-20 rounded bg-green-700 hover:bg-green-800 text-white text-xs"
-                            onClick={() => onSpectate(lobby.id, lobby.status)}
+                            onClick={() => onSpectate(lobby.id)}
                           >
                             Return
                           </Button>
@@ -162,13 +162,15 @@ const LobbyListTable: React.FC<LobbyListTableProps> = ({
                             {blockedReason}
                           </span>
                         </span>
-                      ) : (
+                      ) : lobby.status === 'playing' ? (
                         <button
                           className="underline hover:opacity-70"
-                          onClick={() => onSpectate(lobby.id, lobby.status)}
+                          onClick={() => onSpectate(lobby.id)}
                         >
                           Spectate
                         </button>
+                      ) : (
+                        <span className="text-gray-400">Full</span>
                       )}
                     </TableCell>
                   </TableRow>

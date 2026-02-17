@@ -16,21 +16,12 @@ service cloud.firestore {
 
     // Unified chats collection
     match /chats/{chatId} {
-      // Allow reading the chat document itself (if it exists)
       allow read: if request.auth != null;
       allow write: if false;
 
       match /messages/{messageId} {
-        // Global chat: any authenticated user can read
-        allow read: if request.auth != null && chatId == 'global';
-
-        // Lobby/game chat: any authenticated user can read (allows spectators)
-        allow read: if request.auth != null &&
-                    chatId != 'global' &&
-                    exists(/databases/$(database)/documents/lobbies/$(chatId));
-
-        // Writes are now handled by Cloud Functions
-        allow create, update, delete: if false;
+        allow read: if request.auth != null;
+        allow write: if false;
       }
     }
 

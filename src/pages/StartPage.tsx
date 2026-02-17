@@ -82,13 +82,9 @@ const StartPage: React.FC = () => {
     }
   };
 
-  const handleSpectate = (lobbyId: string, status: string) => {
+  const handleSpectate = (lobbyId: string) => {
     logSpectateGame(lobbyId);
-    if (status === 'playing') {
-      navigate(`/game/${lobbyId}`);
-    } else {
-      navigate(`/lobby/${lobbyId}`);
-    }
+    navigate(`/game/${lobbyId}`);
   };
 
   // Handle returning to game when user has left (clears leftPlayer and navigates)
